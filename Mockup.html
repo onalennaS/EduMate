@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduMate - AI-Powered Education for Africa</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #87CEEB 0%, #ffffff 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(45deg, #87CEEB, #000);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .logo h1 {
+            color: #000;
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+
+        .tagline {
+            color: #666;
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+        }
+
+        nav {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 12px 24px;
+            background: #87CEEB;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(135, 206, 235, 0.3);
+        }
+
+        .nav-btn:hover {
+            background: #000;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .nav-btn.active {
+            background: #000;
+        }
+
+        .content {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            min-height: 500px;
+        }
+
+        .section {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .section.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .feature-card {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border-radius: 12px;
+            padding: 25px;
+            border-left: 5px solid #87CEEB;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(135, 206, 235, 0.2);
+        }
+
+        .feature-card h3 {
+            color: #000;
+            margin-bottom: 15px;
+            font-size: 1.3rem;
+        }
+
+        .feature-card p {
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .chat-interface {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chat-messages {
+            flex: 1;
+            overflow-y: auto;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            margin-bottom: 15px;
+        }
+
+        .message {
+            margin: 10px 0;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 80%;
+        }
+
+        .user-message {
+            background: #87CEEB;
+            color: white;
+            margin-left: auto;
+        }
+
+        .ai-message {
+            background: #e9ecef;
+            color: #333;
+        }
+
+        .chat-input {
+            display: flex;
+            gap: 10px;
+        }
+
+        .chat-input input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #87CEEB;
+            border-radius: 25px;
+            outline: none;
+            font-size: 16px;
+        }
+
+        .send-btn {
+            padding: 12px 20px;
+            background: #87CEEB;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .send-btn:hover {
+            background: #000;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+
+        .stat-card {
+            background: linear-gradient(135deg, #87CEEB, #5f9ea0);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: bold;
+        }
+
+        .lab-simulator {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        .experiment-btn {
+            padding: 15px 30px;
+            background: #87CEEB;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .experiment-btn:hover {
+            background: #000;
+            transform: scale(1.05);
+        }
+
+        .demo-area {
+            background: white;
+            border-radius: 8px;
+            padding: 30px;
+            margin: 20px 0;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #87CEEB;
+        }
+
+        .accessibility-controls {
+            display: flex;
+            gap: 15px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+
+        .control-btn {
+            padding: 10px 20px;
+            background: #000;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .control-btn:hover {
+            background: #87CEEB;
+        }
+
+        .offline-status {
+            background: linear-gradient(135deg, #28a745, #20c997);
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .logo h1 {
+                font-size: 2rem;
+            }
+            
+            nav {
+                justify-content: center;
+            }
+            
+            .nav-btn {
+                padding: 10px 16px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo">
+                <div class="logo-icon">EM</div>
+                <div>
+                    <h1>EduMate</h1>
+                    <p class="tagline">Empowering African Education Through AI</p>
+                </div>
+            </div>
+            <nav>
+                <button class="nav-btn active" onclick="showSection('home')">Home</button>
+                <button class="nav-btn" onclick="showSection('ai-tutor')">AI Tutor</button>
+                <button class="nav-btn" onclick="showSection('virtual-lab')">Virtual Lab</button>
+                <button class="nav-btn" onclick="showSection('accessibility')">Accessibility</button>
+                <button class="nav-btn" onclick="showSection('offline')">Offline Mode</button>
+                <button class="nav-btn" onclick="showSection('dashboard')">Dashboard</button>
+            </nav>
+        </header>
+
+        <div class="content">
+            <!-- Home Section -->
+            <div id="home" class="section active">
+                <h2>Welcome to EduMate</h2>
+                <p>Your comprehensive AI-powered educational platform designed specifically for African students and educators.</p>
+                
+                <div class="feature-grid">
+                    <div class="feature-card" onclick="showSection('ai-tutor')">
+                        <h3>🤖 AI-Powered Tutoring</h3>
+                        <p>Personalized learning experiences with intelligent agents that adapt to each student's pace and learning style.</p>
+                    </div>
+                    <div class="feature-card" onclick="showSection('virtual-lab')">
+                        <h3>🧪 Virtual Science Labs</h3>
+                        <p>Interactive simulations and experiments that bring STEM education to life without physical equipment.</p>
+                    </div>
+                    <div class="feature-card" onclick="showSection('accessibility')">
+                        <h3>♿ Assistive Learning</h3>
+                        <p>Inclusive tools including text-to-speech, sign language recognition, and adaptive interfaces for all learners.</p>
+                    </div>
+                    <div class="feature-card" onclick="showSection('offline')">
+                        <h3>📱 Offline Learning</h3>
+                        <p>SMS-based tutoring and offline content delivery for areas with limited internet connectivity.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- AI Tutor Section -->
+            <div id="ai-tutor" class="section">
+                <h2>AI Tutor - Your Personal Learning Companion</h2>
+                <p>Experience personalized learning with our intelligent tutoring system.</p>
+                
+                <div class="chat-interface">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message ai-message">Hello! I'm your EduMate AI tutor. What subject would you like to study today?</div>
+                        <div class="message user-message">I need help with mathematics</div>
+                        <div class="message ai-message">Great! Let's start with algebra. What specific topic are you working on? I can adapt to your learning pace and provide personalized examples.</div>
+                    </div>
+                    <div class="chat-input">
+                        <input type="text" id="chatInput" placeholder="Ask me anything about your studies...">
+                        <button class="send-btn" onclick="sendMessage()">Send</button>
+                    </div>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>📊 Adaptive Learning</h3>
+                        <p>AI analyzes your progress and adjusts difficulty levels in real-time.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>🌍 Culturally Relevant</h3>
+                        <p>Content tailored to African contexts and local curricula.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Virtual Lab Section -->
+            <div id="virtual-lab" class="section">
+                <h2>Virtual Science Laboratory</h2>
+                <p>Conduct experiments and explore scientific concepts through interactive simulations.</p>
+                
+                <div class="lab-simulator">
+                    <h3>Select an Experiment</h3>
+                    <button class="experiment-btn" onclick="runExperiment('physics')">⚛️ Physics Simulation</button>
+                    <button class="experiment-btn" onclick="runExperiment('chemistry')">🧪 Chemistry Lab</button>
+                    <button class="experiment-btn" onclick="runExperiment('biology')">🔬 Biology Microscope</button>
+                    
+                    <div class="demo-area" id="experimentArea">
+                        <p>Click an experiment button above to start your virtual lab session!</p>
+                    </div>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>💡 Interactive Simulations</h3>
+                        <p>Hands-on learning without physical equipment requirements.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>📱 Mobile Optimized</h3>
+                        <p>Lightweight design that works on basic smartphones.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Accessibility Section -->
+            <div id="accessibility" class="section">
+                <h2>Assistive Learning Tools</h2>
+                <p>Inclusive education features designed to support all learners.</p>
+                
+                <div class="accessibility-controls">
+                    <button class="control-btn" onclick="toggleFeature('tts')">🔊 Text-to-Speech</button>
+                    <button class="control-btn" onclick="toggleFeature('sign')">👋 Sign Language</button>
+                    <button class="control-btn" onclick="toggleFeature('large')">🔍 Large Text</button>
+                    <button class="control-btn" onclick="toggleFeature('contrast')">🎨 High Contrast</button>
+                </div>
+
+                <div class="demo-area">
+                    <p id="accessibilityDemo">This text can be read aloud, translated to sign language, or displayed in large fonts. EduMate ensures every student can learn effectively.</p>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>👁️ Visual Impairment Support</h3>
+                        <p>Screen reader compatibility and audio descriptions for all content.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>👂 Hearing Impairment Support</h3>
+                        <p>Sign language recognition and visual learning indicators.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>🧠 Cognitive Support</h3>
+                        <p>Simplified interfaces and step-by-step guidance options.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Offline Mode Section -->
+            <div id="offline" class="section">
+                <h2>Offline Learning Mode</h2>
+                <p>Learning continues even without internet connectivity.</p>
+                
+                <div class="offline-status">
+                    <h3>📱 SMS Learning Active</h3>
+                    <p>Students can receive lessons and submit answers via SMS</p>
+                </div>
+
+                <div class="chat-interface">
+                    <div class="chat-messages">
+                        <div class="message ai-message">SMS Mode: Math Quiz - What is 15 + 27? Reply with your answer.</div>
+                        <div class="message user-message">42</div>
+                        <div class="message ai-message">Correct! Great job. Next question: If a triangle has angles of 60° and 70°, what is the third angle?</div>
+                    </div>
+                    <div style="text-align: center; color: #666; margin-top: 10px;">
+                        <small>Simulated SMS conversation - works on any mobile phone</small>
+                    </div>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>📨 SMS-Based Learning</h3>
+                        <p>Educational content delivered through text messages.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>💾 Offline Storage</h3>
+                        <p>Download lessons for offline study when connectivity returns.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Dashboard Section -->
+            <div id="dashboard" class="section">
+                <h2>Learning Analytics Dashboard</h2>
+                <p>Track progress and gain insights into student performance.</p>
+                
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-number">15,742</div>
+                        <div>Active Students</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">89%</div>
+                        <div>Completion Rate</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">12</div>
+                        <div>Countries</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-number">456</div>
+                        <div>Partner Schools</div>
+                    </div>
+                </div>
+
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>📈 Performance Analytics</h3>
+                        <p>Real-time insights into student learning patterns and progress.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>🎯 Personalized Recommendations</h3>
+                        <p>AI-driven suggestions for improving learning outcomes.</p>
+                    </div>
+                    <div class="feature-card">
+                        <h3>👥 Teacher Insights</h3>
+                        <p>Tools to help educators identify and address learning gaps.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showSection(sectionName) {
+            // Hide all sections
+            document.querySelectorAll('.section').forEach(section => {
+                section.classList.remove('active');
+            });
+            
+            // Remove active class from all nav buttons
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Show selected section
+            document.getElementById(sectionName).classList.add('active');
+            
+            // Add active class to clicked button
+            event.target.classList.add('active');
+        }
+
+        function sendMessage() {
+            const input = document.getElementById('chatInput');
+            const messages = document.getElementById('chatMessages');
+            
+            if (input.value.trim()) {
+                // Add user message
+                const userMessage = document.createElement('div');
+                userMessage.className = 'message user-message';
+                userMessage.textContent = input.value;
+                messages.appendChild(userMessage);
+                
+                // Simulate AI response
+                setTimeout(() => {
+                    const aiMessage = document.createElement('div');
+                    aiMessage.className = 'message ai-message';
+                    aiMessage.textContent = generateAIResponse(input.value);
+                    messages.appendChild(aiMessage);
+                    messages.scrollTop = messages.scrollHeight;
+                }, 1000);
+                
+                input.value = '';
+                messages.scrollTop = messages.scrollHeight;
+            }
+        }
+
+        function generateAIResponse(userInput) {
+            const responses = [
+                "That's a great question! Let me break that down for you step by step.",
+                "I understand you're working on this topic. Here's a personalized explanation based on your learning level.",
+                "Excellent! Let me provide some practice problems to help reinforce this concept.",
+                "I can see you're making good progress. Would you like to try a more challenging example?",
+                "Let me adapt this explanation to fit the South African curriculum you're following."
+            ];
+            return responses[Math.floor(Math.random() * responses.length)];
+        }
+
+        function runExperiment(type) {
+            const area = document.getElementById('experimentArea');
+            const experiments = {
+                physics: "🎲 Running pendulum simulation... Observe how gravity affects the swing period!",
+                chemistry: "⚗️ Mixing virtual chemicals... Watch the color change reaction!",
+                biology: "🦠 Loading microscope view... Examining plant cell structures!"
+            };
+            
+            area.innerHTML = `<div style="font-size: 1.2em; color: #87CEEB;">${experiments[type]}</div>`;
+            
+            setTimeout(() => {
+                area.innerHTML = `<div style="color: #28a745;">✅ Experiment completed! Results have been recorded in your learning progress.</div>`;
+            }, 3000);
+        }
+
+        function toggleFeature(feature) {
+            const demo = document.getElementById('accessibilityDemo');
+            const features = {
+                tts: "🔊 Text-to-speech activated! This text would be read aloud to support visually impaired learners.",
+                sign: "👋 Sign language mode enabled! Visual gestures would accompany this text.",
+                large: "🔍 Large text mode activated! Font size increased for better readability.",
+                contrast: "🎨 High contrast mode enabled! Colors adjusted for visual accessibility."
+            };
+            
+            demo.textContent = features[feature];
+            demo.style.background = '#e8f5e8';
+            demo.style.padding = '20px';
+            demo.style.borderRadius = '8px';
+            
+            setTimeout(() => {
+                demo.style.background = 'transparent';
+                demo.textContent = "This text can be read aloud, translated to sign language, or displayed in large fonts. EduMate ensures every student can learn effectively.";
+            }, 3000);
+        }
+
+        // Enable enter key for chat
+        document.getElementById('chatInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Simulate real-time stats updates
+        setInterval(() => {
+            const statNumbers = document.querySelectorAll('.stat-number');
+            statNumbers.forEach(stat => {
+                if (stat.textContent.includes('%')) return;
+                const current = parseInt(stat.textContent.replace(',', ''));
+                const increment = Math.floor(Math.random() * 3) + 1;
+                const newValue = current + increment;
+                stat.textContent = newValue.toLocaleString();
+            });
+        }, 10000);
+    </script>
+</body>
+</html>
