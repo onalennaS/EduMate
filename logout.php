@@ -1,7 +1,10 @@
 <?php
-session_start();
-session_unset();
-session_destroy();
-header("Location: home.php");
+require_once 'auth.php';
+
+// Logout user
+logoutUser();
+
+// Redirect to home page
+header("Location: index.php?logout=1");
 exit();
 ?>

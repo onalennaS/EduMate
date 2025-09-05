@@ -1,229 +1,142 @@
 <?php
-session_start();
-include 'db_connection.php';
+require_once 'auth.php';
 
-$message = '';
-$alertType = '';
+// If user is already logged in, redirect to dashboard
+redirectIfLoggedIn();
 
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+$error = '';
+$success = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
-    $confirm_password = isset($_POST['confirm_password']) ? trim($_POST['confirm_password']) : '';
-
-    // Validation for username, email, and password
-    if (empty($username) || empty($email) || empty($password) || empty($confirm_password)) {
-        $message = "All fields are required.";
-        $alertType = "error";
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $message = "Invalid email format!";
-        $alertType = "error";
-    } elseif (strlen($password) < 6) {
-        $message = "Password must be at least 6 characters long.";
-        $alertType = "error";
-    } elseif ($password !== $confirm_password) {
-        $message = "Passwords do not match!";
-        $alertType = "error";
+    $confirm_password = trim($_POST['confirm_password']);
+    $user_type = $_POST['user_type'];
+    
+    if ($password !== $confirm_password) {
+        $error = "Passwords do not match";
     } else {
-        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-
-        $stmt = $conn->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
-        $stmt->bind_param("ss", $username, $email);
-        $stmt->execute();
-        $stmt->store_result();
-
-        if ($stmt->num_rows > 0) {
-            $message = "Username or Email already exists!";
-            $alertType = "error";
-        } else {
-            $stmt->close();
-            $stmt = $conn->prepare("INSERT INTO users (username, email, password) VALUES (?, ?, ?)");
-            $stmt->bind_param("sss", $username, $email, $hashed_password);
-            if ($stmt->execute()) {
-                $message = "Registration successful!";
-                $alertType = "success";
+        $result = registerUser($username, $email, $password, $user_type);
+        if ($result === true) {
+            // Auto-login after successful registration
+            $loginResult = loginUser($email, $password);
+            if ($loginResult === true) {
+                header("Location: dashboard.php");
+                exit();
+            } else {
+                $success = "Registration successful! Please login.";
             }
-            $stmt->close();
+        } else {
+            $error = $result;
         }
     }
-    $conn->close();
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>User Registration</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;600&display=swap" rel="stylesheet">
-
-    <!-- Bootstrap & SweetAlert2 -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-    <style>
-        * {
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(120deg, #6a5acd, #8a2be2);
-            min-height: 100vh;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0;
-        }
-
-        .container {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-        }
-
-        .card {
-            background: #ffffff;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 450px;
-        }
-
-        .card h3 {
-            text-align: center;
-            margin-bottom: 20px;
-            font-weight: 600;
-        }
-
-        .form-label {
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .form-control {
-            font-size: 14px;
-            border-radius: 8px;
-            padding: 10px;
-        }
-
-        .btn-primary {
-            background: #6a5acd;
-            border: none;
-            border-radius: 8px;
-            width: 100%;
-            padding: 12px;
-            font-size: 16px;
-            transition: background 0.3s ease;
-        }
-
-        .btn-primary:hover {
-            background: #8a2be2;
-        }
-
-        .form-links {
-            margin-top: 15px;
-            text-align: center;
-            font-size: 14px;
-        }
-
-        .form-links a {
-            color: #6a5acd;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .form-links a:hover {
-            text-decoration: underline;
-        }
-
-        .overlay {
-            position: fixed;
-            top: 0; left: 0;
-            width: 100vw; height: 100vh;
-            background: rgba(255, 255, 255, 0.7);
-            z-index: 9999;
-            display: none;
-            justify-content: center;
-            align-items: center;
-        }
-
-        .spinner-border {
-            width: 3rem;
-            height: 3rem;
-            color: #6a5acd;
-        }
-
-        @media (max-width: 768px) {
-            .container {
-                padding: 15px;
-            }
-        }
-    </style>
+    <title>Register - EduMate</title>
+    <link rel="stylesheet" href="static/css/style.css">
 </head>
 <body>
+    
 
-<!-- Loading Spinner -->
-<div class="overlay" id="loadingSpinner">
-    <div class="spinner-border" role="status">
-        <span class="visually-hidden">Loading...</span>
-    </div>
-</div>
-
-<div class="container">
-    <div class="card">
-        <h3>Create Your Account</h3>
-        <form method="POST" action="" onsubmit="showLoading()">
-            <div class="mb-3">
-                <label class="form-label">Username</label>
-                <input type="text" name="username" class="form-control" placeholder="Choose a username" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Email address</label>
-                <input type="email" name="email" class="form-control" placeholder="Enter email" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Password</label>
-                <input type="password" name="password" class="form-control" placeholder="Create password" required>
-            </div>
-            <div class="mb-3">
-                <label class="form-label">Confirm Password</label>
-                <input type="password" name="confirm_password" class="form-control" placeholder="Repeat password" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Register</button>
-        </form>
-        <div class="form-links">
-            <a href="home.php">← Back to Home</a> |
-            <a href="login.php">Already registered? Login</a>
+    <section class="auth-container">
+        <div class="auth-form">
+            <h2>Create an EduMate Account</h2>
+            
+            <?php if ($error): ?>
+                <div class="error-message"><?php echo h($error); ?></div>
+            <?php endif; ?>
+            
+            <?php if ($success): ?>
+                <div class="success-message"><?php echo h($success); ?></div>
+            <?php endif; ?>
+            
+            <form method="POST" action="" id="registerForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" 
+                           value="<?php echo isset($_POST['username']) ? h($_POST['username']) : ''; ?>" 
+                           required>
+                    <small>3-20 characters, letters, numbers, and underscores only</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" 
+                           value="<?php echo isset($_POST['email']) ? h($_POST['email']) : ''; ?>" 
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user_type">I am a:</label>
+                    <select id="user_type" name="user_type" required>
+                        <option value="">Select your role</option>
+                        <option value="student" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'student') ? 'selected' : ''; ?>>Student</option>
+                        <option value="teacher" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'teacher') ? 'selected' : ''; ?>>Teacher</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                    <small>Password must be at least 6 characters long</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required>
+                </div>
+                
+                <button type="submit" class="btn" style="width: 100%;">Register</button>
+            </form>
+            
+            <p style="margin-top: 1rem; text-align: center;">
+                Already have an account? <a href="login.php" style="color: #6c63ff;">Login here</a>
+            </p>
         </div>
-    </div>
-</div>
+    </section>
 
-<script>
-    // Show loading animation
-    function showLoading() {
-        document.getElementById("loadingSpinner").style.display = "flex";
-    }
+    
 
-    // SweetAlert message
-    <?php if (!empty($message)) : ?>
-        Swal.fire({
-            icon: '<?php echo $alertType; ?>',
-            title: '<?php echo ucfirst($alertType); ?>',
-            text: '<?php echo $message; ?>',
-            confirmButtonColor: '#6a5acd',
-            willClose: () => {
-                document.getElementById("loadingSpinner").style.display = "none";
+    <script>
+        // Client-side password confirmation validation
+        document.getElementById('confirm_password').addEventListener('input', function() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = this.value;
+            
+            if (password !== confirmPassword && confirmPassword.length > 0) {
+                this.setCustomValidity('Passwords do not match');
+                this.style.borderColor = '#c62828';
+            } else {
+                this.setCustomValidity('');
+                this.style.borderColor = '';
             }
         });
-    <?php endif; ?>
-</script>
-
+        
+        // Username validation
+        document.getElementById('username').addEventListener('input', function() {
+            const username = this.value;
+            const regex = /^[a-zA-Z0-9_]{3,20}$/;
+            
+            if (username.length > 0 && !regex.test(username)) {
+                this.setCustomValidity('Username must be 3-20 characters long and contain only letters, numbers, and underscores');
+                this.style.borderColor = '#c62828';
+            } else {
+                this.setCustomValidity('');
+                this.style.borderColor = '';
+            }
+        });
+        
+        // Add loading state to form
+        document.getElementById('registerForm').addEventListener('submit', function() {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Account...';
+        });
+    </script>
 </body>
 </html>
