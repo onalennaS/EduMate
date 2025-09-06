@@ -5,7 +5,34 @@ if (session_status() == PHP_SESSION_NONE) {
 }
 
 // Include database configuration
-require_once 'config.php';
+require_once __DIR__ . '/../config/database.php';
+
+/**
+ * Create users table if it doesn't exist
+ */
+function createUsersTable() {
+    global $pdo;
+    
+    try {
+        $sql = "CREATE TABLE IF NOT EXISTS users (
+            id INT(11) AUTO_INCREMENT PRIMARY KEY,
+            username VARCHAR(50) NOT NULL UNIQUE,
+            email VARCHAR(100) NOT NULL UNIQUE,
+            password VARCHAR(255) NOT NULL,
+            user_type ENUM('student', 'teacher') NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_login TIMESTAMP NULL,
+            INDEX idx_email (email),
+            INDEX idx_username (username)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
+        
+        $pdo->exec($sql);
+        return true;
+    } catch(PDOException $e) {
+        error_log("Error creating users table: " . $e->getMessage());
+        throw new Exception("Failed to create users table: " . $e->getMessage());
+    }
+}
 
 /**
  * Check if user is logged in
@@ -39,31 +66,31 @@ function getCurrentUser() {
 function registerUser($username, $email, $password, $user_type) {
     global $pdo;
     
+    if (!isset($pdo)) {
+        error_log("Database connection not available in registerUser");
+        return "Database connection error";
+    }
+    
     // Validate inputs
     if (empty($username) || empty($email) || empty($password) || empty($user_type)) {
         return "All fields are required";
     }
     
-    // Trim inputs
     $username = trim($username);
     $email = trim($email);
     
-    // Validate email format
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         return "Invalid email format";
     }
     
-    // Validate password length
     if (strlen($password) < 6) {
         return "Password must be at least 6 characters long";
     }
     
-    // Validate user type
     if (!in_array($user_type, ['student', 'teacher'])) {
         return "Invalid user type";
     }
     
-    // Validate username (alphanumeric and underscore only)
     if (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
         return "Username must be 3-20 characters long and contain only letters, numbers, and underscores";
     }
@@ -98,17 +125,20 @@ function registerUser($username, $email, $password, $user_type) {
 }
 
 /**
- * Login user
+ * Login user - Fixed version
  */
 function loginUser($email, $password) {
     global $pdo;
     
-    // Validate inputs
+    if (!isset($pdo)) {
+        error_log("Database connection not available in loginUser");
+        return "Database connection error";
+    }
+    
     if (empty($email) || empty($password)) {
         return "Email and password are required";
     }
     
-    // Trim email
     $email = trim($email);
     
     try {
@@ -116,7 +146,15 @@ function loginUser($email, $password) {
         $stmt->execute([$email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($user && password_verify($password, $user['password'])) {
+        if (!$user) {
+            error_log("Login attempt - No user found with email: " . $email);
+            return "Invalid email or password";
+        }
+        
+        if (password_verify($password, $user['password'])) {
+            // Regenerate session ID for security
+            session_regenerate_id(true);
+            
             // Set session variables
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['username'] = $user['username'];
@@ -127,8 +165,10 @@ function loginUser($email, $password) {
             $stmt = $pdo->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
             $stmt->execute([$user['id']]);
             
+            error_log("Successful login for user: " . $user['email']);
             return true;
         } else {
+            error_log("Login attempt - Wrong password for email: " . $email);
             return "Invalid email or password";
         }
     } catch(PDOException $e) {
@@ -141,10 +181,8 @@ function loginUser($email, $password) {
  * Logout user
  */
 function logoutUser() {
-    // Destroy all session data
     $_SESSION = array();
     
-    // Delete the session cookie
     if (ini_get("session.use_cookies")) {
         $params = session_get_cookie_params();
         setcookie(session_name(), '', time() - 42000,
@@ -153,13 +191,12 @@ function logoutUser() {
         );
     }
     
-    // Destroy the session
     session_destroy();
     return true;
 }
 
 /**
- * Redirect if not logged in
+ * Redirect if not logged in - Simple version
  */
 function requireLogin() {
     if (!isLoggedIn()) {
@@ -169,56 +206,16 @@ function requireLogin() {
 }
 
 /**
- * Redirect if already logged in
- */
-function redirectIfLoggedIn() {
-    if (isLoggedIn()) {
-        header("Location: dashboard.php");
-        exit();
-    }
-}
-
-/**
- * Create users table if it doesn't exist
- */
-function createUsersTable() {
-    global $pdo;
-    
-    try {
-        $sql = "CREATE TABLE IF NOT EXISTS users (
-            id INT AUTO_INCREMENT PRIMARY KEY,
-            username VARCHAR(50) UNIQUE NOT NULL,
-            email VARCHAR(100) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL,
-            user_type ENUM('student', 'teacher') NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_login TIMESTAMP NULL,
-            INDEX idx_email (email),
-            INDEX idx_username (username)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci";
-        
-        $pdo->exec($sql);
-        
-      
-        
-        return true;
-    } catch(PDOException $e) {
-        error_log("Error creating users table: " . $e->getMessage());
-        return false;
-    }
-}
-
-
-
-/**
  * Sanitize output for HTML
  */
 function h($string) {
     return htmlspecialchars($string, ENT_QUOTES, 'UTF-8');
 }
 
-// Initialize database table when this file is included
-if (isset($pdo)) {
+// Initialize database table if it doesn't exist
+try {
     createUsersTable();
+} catch(Exception $e) {
+    error_log("Failed to initialize database: " . $e->getMessage());
 }
 ?>

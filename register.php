@@ -1,11 +1,15 @@
 <?php
-require_once 'auth.php';
+require_once 'includes/auth.php';
 
-// If user is already logged in, redirect to dashboard
-redirectIfLoggedIn();
+// If user is already logged in, redirect to home page
+if (isLoggedIn()) {
+    header("Location: index.php");
+    exit();
+}
 
 $error = '';
 $success = '';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
@@ -18,14 +22,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         $result = registerUser($username, $email, $password, $user_type);
         if ($result === true) {
-            // Auto-login after successful registration
-            $loginResult = loginUser($email, $password);
-            if ($loginResult === true) {
-                header("Location: dashboard.php");
-                exit();
-            } else {
-                $success = "Registration successful! Please login.";
-            }
+            // Redirect to login page after successful registration
+            header("Location: login.php?registered=1");
+            exit();
         } else {
             $error = $result;
         }
@@ -38,10 +37,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - EduMate</title>
-    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    
+    <header>
+        <nav>
+            <div class="logo">EduMate</div>
+            <ul>
+                <li><a href="index.php">Home</a></li>
+                <li><a href="login.php">Login</a></li>
+            </ul>
+        </nav>
+    </header>
 
     <section class="auth-container">
         <div class="auth-form">
@@ -100,7 +107,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </div>
     </section>
 
-    
+    <footer>
+        <p>&copy; 2024 EduMate. All rights reserved.</p>
+    </footer>
 
     <script>
         // Client-side password confirmation validation

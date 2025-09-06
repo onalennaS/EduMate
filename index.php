@@ -1,5 +1,5 @@
 <?php
-require_once 'auth.php';
+require_once 'includes/auth.php';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -7,7 +7,8 @@ require_once 'auth.php';
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduMate - Accessible Science Education</title>
-    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/dashboard.css">
 </head>
 <body>
     <header>
@@ -19,8 +20,13 @@ require_once 'auth.php';
                 <li><a href="#about">About</a></li>
                 
                 <?php if (isLoggedIn()): ?>
-                    <li><a href="dashboard.php">Dashboard</a></li>
+                    <?php if ($_SESSION['user_type'] === 'student'): ?>
+                        <li><a href="student_dashboard/student_dashboard.php">Dashboard</a></li>
+                    <?php else: ?>
+                        <li><a href="teacher_dashboard/teacher_dashboard.php">Dashboard</a></li>
+                    <?php endif; ?>
                     <li><a href="logout.php">Logout</a></li>
+                    <li><span style="opacity: 0.8;">Welcome, <?php echo h($_SESSION['username']); ?>!</span></li>
                 <?php else: ?>
                     <li><a href="login.php">Login</a></li>
                     <li><a href="register.php" class="btn">Sign Up</a></li>
@@ -33,11 +39,7 @@ require_once 'auth.php';
         <div class="hero-content">
             <h1>Making Science Education Accessible to All</h1>
             <p>EduMate adapts experiments based on each student's abilities and learning pace, ensuring meaningful engagement with core scientific concepts regardless of disabilities.</p>
-            <?php if (isLoggedIn()): ?>
-                <?php $user = getCurrentUser(); ?>
-                <p style="margin-bottom: 1rem; opacity: 0.9;">Welcome back, <?php echo h($user['username']); ?>!</p>
-                <a href="dashboard.php" class="btn btn-large">Go to Dashboard</a>
-            <?php else: ?>
+            <?php if (!isLoggedIn()): ?>
                 <a href="register.php" class="btn btn-large">Get Started</a>
             <?php endif; ?>
         </div>
@@ -93,14 +95,11 @@ require_once 'auth.php';
             <a href="register.php" class="btn btn-large" style="margin-right: 1rem;">Sign Up Now</a>
             <a href="login.php" class="btn btn-large" style="background-color: #28a745;">Login</a>
         </div>
-        
-       
     </section>
     <?php endif; ?>
 
     <footer id="contact">
         <p>&copy; 2024 EduMate. All rights reserved.</p>
-        
     </footer>
 </body>
 </html>

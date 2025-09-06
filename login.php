@@ -1,17 +1,33 @@
 <?php
-require_once 'auth.php';
+require_once 'includes/auth.php';
 
-// If user is already logged in, redirect to dashboard
-redirectIfLoggedIn();
+// If user is already logged in, redirect to home page
+if (isLoggedIn()) {
+    header("Location: index.php");
+    exit();
+}
 
 $error = '';
+$success = '';
+
+// Check if user just registered
+if (isset($_GET['registered']) && $_GET['registered'] == '1') {
+    $success = 'Registration successful! Please login with your credentials.';
+}
+
+// Check if user just logged out
+if (isset($_GET['logout']) && $_GET['logout'] == '1') {
+    $success = 'You have been successfully logged out.';
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
     
     $result = loginUser($email, $password);
     if ($result === true) {
-        header("Location: dashboard.php");
+        // Successful login - redirect to home page
+        header("Location: index.php");
         exit();
     } else {
         $error = $result;
@@ -24,10 +40,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - EduMate</title>
-    <link rel="stylesheet" href="static/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    
+    <header>
+        <nav>
+            <div class="logo">EduMate</div>
+            <ul>
+                <li><a href="index.php">Home</a></li>
+                <li><a href="register.php">Sign Up</a></li>
+            </ul>
+        </nav>
+    </header>
 
     <section class="auth-container">
         <div class="auth-form">
@@ -35,6 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             <?php if ($error): ?>
                 <div class="error-message"><?php echo h($error); ?></div>
+            <?php endif; ?>
+            
+            <?php if ($success): ?>
+                <div class="success-message"><?php echo h($success); ?></div>
             <?php endif; ?>
             
             <form method="POST" action="" id="loginForm">
@@ -56,19 +84,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <p style="margin-top: 1rem; text-align: center;">
                 Don't have an account? <a href="register.php" style="color: #6c63ff;">Register here</a>
             </p>
-            
-           
         </div>
     </section>
 
-    
+    <footer>
+        <p>&copy; 2024 EduMate. All rights reserved.</p>
+    </footer>
 
     <script>
-        function fillDemo(email, password) {
-            document.getElementById('email').value = email;
-            document.getElementById('password').value = password;
-        }
-        
         // Add loading state to form
         document.getElementById('loginForm').addEventListener('submit', function() {
             const submitBtn = this.querySelector('button[type="submit"]');
