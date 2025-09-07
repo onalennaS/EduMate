@@ -1,5 +1,5 @@
 <?php
-require_once 'auth.php';
+require_once 'includes/auth.php';
 
 // If user is already logged in, redirect to home page
 if (isLoggedIn()) {
@@ -150,4 +150,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </body>
 
 </html>
+
 
