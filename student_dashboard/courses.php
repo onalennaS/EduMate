@@ -8,7 +8,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔬 Science Lab</h1>
+        <h1> Science Lab</h1>
         <p>Mix chemicals and observe reactions!</p>
 
         <div class="lab-controls">
@@ -221,3 +221,4 @@ function mixChemicals() {
 
     resultDiv.innerHTML = reactionText;
 }
+
