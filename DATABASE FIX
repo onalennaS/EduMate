@@ -90,7 +90,7 @@ echo json_encode($reaction);
 <head>
     <meta charset="UTF-8">
     <title>Science Lab</title>
-    <link rel="stylesheet" href="assets/style.css">
+    <link rel="stylesheet" href="style1.css">
 </head>
 <body>
 <div class="container">
