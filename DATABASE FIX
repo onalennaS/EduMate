@@ -1,0 +1,211 @@
+CREATE TABLE chemicals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE
+);
+
+CREATE TABLE reactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    chemical_a_id INT NOT NULL,
+    chemical_b_id INT NOT NULL,
+    description TEXT NOT NULL,
+    animation VARCHAR(50),
+    sound BOOLEAN DEFAULT FALSE,
+    FOREIGN KEY (chemical_a_id) REFERENCES chemicals(id),
+    FOREIGN KEY (chemical_b_id) REFERENCES chemicals(id)
+);
+
+CREATE TABLE experiment_history (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    chemical_a_id INT NOT NULL,
+    chemical_b_id INT NOT NULL,
+    reaction_description TEXT NOT NULL,
+    reaction_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (chemical_a_id) REFERENCES chemicals(id),
+    FOREIGN KEY (chemical_b_id) REFERENCES chemicals(id)
+);
+
+INSERT INTO chemicals (name) VALUES 
+('Water'), ('Sodium'), ('Vinegar'), ('Chlorine'), ('Baking Soda'), ('Acid');
+
+INSERT INTO reactions (chemical_a_id, chemical_b_id, description, animation, sound) VALUES
+((SELECT id FROM chemicals WHERE name='Water'), (SELECT id FROM chemicals WHERE name='Sodium'), ' Boom! Violent reaction!  Sodium explodes in water!', 'explosion', 1),
+((SELECT id FROM chemicals WHERE name='Vinegar'), (SELECT id FROM chemicals WHERE name='Baking Soda'), ' Fizzing reaction! CO₂ bubbles everywhere!', 'bubbles', 0),
+((SELECT id FROM chemicals WHERE name='Sodium'), (SELECT id FROM chemicals WHERE name='Chlorine'), ' They bond and form salt!', NULL, 0),
+((SELECT id FROM chemicals WHERE name='Acid'), (SELECT id FROM chemicals WHERE name='Baking Soda'), ' Acid reacts violently with baking soda!', 'explosion', 1);
+
+// GET_CHEMICALS
+<?php
+$pdo = new PDO('mysql:host=localhost;dbname='');
+$stmt = $pdo->query("SELECT id, name FROM chemicals ORDER BY name");
+$chemicals = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+header('Content-Type: application/json');
+echo json_encode($chemicals);
+
+//GET_REACTION
+<?php
+
+$pdo = new PDO('mysql:host=localhost;dbname='');
+
+$chemicalA = intval($_POST['chemical_a_id']);
+$chemicalB = intval($_POST['chemical_b_id']);
+$userId = intval($_POST['user_id'] ?? 0);
+
+$sql = "SELECT * FROM reactions WHERE 
+    (chemical_a_id = :a AND chemical_b_id = :b) OR 
+    (chemical_a_id = :b AND chemical_b_id = :a) LIMIT 1";
+$stmt = $pdo->prepare($sql);
+$stmt->execute(['a' => $chemicalA, 'b' => $chemicalB]);
+$reaction = $stmt->fetch(PDO::FETCH_ASSOC);
+
+if (!$reaction) {
+    $reaction = [
+        'description' => ' No noticeable reaction.',
+        'animation' => null,
+        'sound' => false,
+    ];
+}
+
+
+if ($userId && $reaction) {
+    $stmt = $pdo->prepare("INSERT INTO experiment_history 
+        (user_id, chemical_a_id, chemical_b_id, reaction_description)
+        VALUES (:user, :a, :b, :desc)");
+    $stmt->execute([
+        'user' => $userId,
+        'a' => $chemicalA,
+        'b' => $chemicalB,
+        'desc' => $reaction['description'],
+    ]);
+}
+
+header('Content-Type: application/json');
+echo json_encode($reaction);
+
+//THE FRONTEND
+<?php session_start(); ?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Science Lab</title>
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="container">
+    <h1> Science Lab</h1>
+    <p>Mix chemicals and observe reactions!</p>
+
+    <div class="lab-controls">
+        <select id="chemicalA"></select>
+        <select id="chemicalB"></select>
+        <button onclick="mixChemicals()">Mix </button>
+    </div>
+
+    <div class="reaction-result" id="reactionResult"> The result of your reaction will appear here.</div>
+
+    <div class="reaction-visual" id="reactionVisual"></div>
+
+    <audio id="reactionSound" src="assets/reaction.mp3"></audio>
+
+    <h2>Your Experiment History</h2>
+    <ul id="historyList"></ul>
+</div>
+
+<script>
+const userId = <?php echo $_SESSION['user_id'] ?? 0; ?>;
+
+async function loadChemicals() {
+    const res = await fetch('get_chemicals.php');
+    const chemicals = await res.json();
+
+    const selectA = document.getElementById('chemicalA');
+    const selectB = document.getElementById('chemicalB');
+
+    selectA.innerHTML = '<option value="">Select Chemical A</option>';
+    selectB.innerHTML = '<option value="">Select Chemical B</option>';
+
+    chemicals.forEach(c => {
+        const optionA = document.createElement('option');
+        optionA.value = c.id;
+        optionA.textContent = c.name;
+        selectA.appendChild(optionA);
+
+        const optionB = document.createElement('option');
+        optionB.value = c.id;
+        optionB.textContent = c.name;
+        selectB.appendChild(optionB);
+    });
+}
+
+async function mixChemicals() {
+    const chemicalA = document.getElementById('chemicalA').value;
+    const chemicalB = document.getElementById('chemicalB').value;
+    const resultDiv = document.getElementById('reactionResult');
+    const visualDiv = document.getElementById('reactionVisual');
+    const sound = document.getElementById('reactionSound');
+
+    visualDiv.innerHTML = "";
+    resultDiv.innerHTML = "";
+
+    if (!chemicalA || !chemicalB) {
+        resultDiv.textContent = " Please select both chemicals!";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('chemical_a_id', chemicalA);
+    formData.append('chemical_b_id', chemicalB);
+    formData.append('user_id', userId);
+
+    const res = await fetch('get_reaction.php', { method: 'POST', body: formData });
+    const reaction = await res.json();
+
+    resultDiv.textContent = reaction.description;
+
+    if (reaction.animation === "explosion") {
+        const explosion = document.createElement("div");
+        explosion.className = "explosion";
+        visualDiv.appendChild(explosion);
+    } else if (reaction.animation === "bubbles") {
+        for (let i = 0; i < 10; i++) {
+            const bubble = document.createElement("div");
+            bubble.className = "bubbles";
+            bubble.style.left = `${Math.random() * 300}px`;
+            bubble.style.animationDelay = `${Math.random()}s`;
+            visualDiv.appendChild(bubble);
+        }
+    }
+
+    if (reaction.sound) {
+        sound.currentTime = 0;
+        sound.play();
+    }
+
+    loadExperimentHistory();
+}
+
+async function loadExperimentHistory() {
+    if (!userId) return;
+
+    const res = await fetch('get_history.php?user_id=' + userId);
+    const history = await res.json();
+
+    const historyList = document.getElementById('historyList');
+    historyList.innerHTML = '';
+
+    history.forEach(item => {
+        const li = document.createElement('li');
+        li.textContent = `${item.time} - Mixed ${item.chemicalA} + ${item.chemicalB}: ${item.description}`;
+        historyList.appendChild(li);
+    });
+}
+
+loadChemicals();
+
+</script>
+<script src="script.js"></script>
+</body>
+</html>
+
