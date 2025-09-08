@@ -15,10 +15,7 @@ if (isset($_GET['registered']) && $_GET['registered'] == '1') {
     $success = 'Registration successful! Please login with your credentials.';
 }
 
-// Check if user just logged out
-if (isset($_GET['logout']) && $_GET['logout'] == '1') {
-    $success = 'You have been successfully logged out.';
-}
+
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
@@ -41,21 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - EduMate</title>
     <link rel="stylesheet" href="assets/css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
 </head>
 <body>
-    <header>
-        <nav>
-            <div class="logo">EduMate</div>
-            <ul>
-                <li><a href="index.php">Home</a></li>
-                <li><a href="register.php">Sign Up</a></li>
-            </ul>
-        </nav>
-    </header>
+
 
     <section class="auth-container">
         <div class="auth-form">
-            <h2>Login to EduMate</h2>
+            <h2>Login</h2>
             
             <?php if ($error): ?>
                 <div class="error-message"><?php echo h($error); ?></div>
@@ -99,6 +90,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             submitBtn.textContent = 'Logging in...';
         });
     </script>
+    <script>
+
+
+// Add loading state to form
+document.getElementById('loginForm').addEventListener('submit', function() {
+    const submitBtn = this.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Logging in...';
+});
+</script>
 </body>
 
 </html>

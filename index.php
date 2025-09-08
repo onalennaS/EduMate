@@ -8,7 +8,8 @@ require_once 'includes/auth.php';
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduMate - Accessible Science Education</title>
     <link rel="stylesheet" href="assets/css/style.css">
-    <link rel="stylesheet" href="assets/css/dashboard.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+   
 </head>
 <body>
     <header>
@@ -25,7 +26,7 @@ require_once 'includes/auth.php';
                     <?php else: ?>
                         <li><a href="teacher_dashboard/teacher_dashboard.php">Dashboard</a></li>
                     <?php endif; ?>
-                    <li><a href="logout.php">Logout</a></li>
+                    <li><a href="#" onclick="confirmLogout()">Logout</a></li>
                     <li><span style="opacity: 0.8;">Welcome, <?php echo h($_SESSION['username']); ?>!</span></li>
                 <?php else: ?>
                     <li><a href="login.php">Login</a></li>
@@ -101,5 +102,26 @@ require_once 'includes/auth.php';
     <footer id="contact">
         <p>&copy; 2024 EduMate. All rights reserved.</p>
     </footer>
+    <script>
+
+</script>
+<script>
+function confirmLogout() {
+    Swal.fire({
+        title: 'Are you sure?',
+        text: 'Do you want to log out of EduMate?',
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#6c63ff',
+        cancelButtonColor: '#d33',
+        confirmButtonText: 'Yes, log out',
+        cancelButtonText: 'Cancel'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            window.location.href = 'logout.php';
+        }
+    });
+}
+</script>
 </body>
 </html>
