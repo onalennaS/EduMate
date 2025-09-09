@@ -1,3 +1,63 @@
+<?php
+// register.php
+require_once 'includes/auth.php'; // This should define $pdo (PDO instance)
+
+$error = '';
+$success = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username   = trim($_POST['username'] ?? '');
+    $email      = trim($_POST['email'] ?? '');
+    $user_type  = trim($_POST['user_type'] ?? '');
+    $password   = $_POST['password'] ?? '';
+    $confirm    = $_POST['confirm_password'] ?? '';
+
+    // 1. Validation
+    if (empty($username) || empty($email) || empty($user_type) || empty($password) || empty($confirm)) {
+        $error = "All fields are required.";
+    } elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
+        $error = "Username must be 3-20 characters and only contain letters, numbers, and underscores.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Invalid email format.";
+    } elseif ($password !== $confirm) {
+        $error = "Passwords do not match.";
+    } elseif (strlen($password) < 6) {
+        $error = "Password must be at least 6 characters long.";
+    } else {
+        try {
+            // 2. Check if username/email exists
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = :username OR email = :email");
+            $stmt->execute(['username' => $username, 'email' => $email]);
+
+            if ($stmt->fetch()) {
+                $error = "Username or email already exists.";
+            } else {
+                // 3. Insert new user
+                $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+
+                $stmt = $pdo->prepare("INSERT INTO users (username, email, user_type, password) 
+                                       VALUES (:username, :email, :user_type, :password)");
+                $successInsert = $stmt->execute([
+                    'username'   => $username,
+                    'email'      => $email,
+                    'user_type'  => $user_type,
+                    'password'   => $hashedPassword
+                ]);
+
+                if ($successInsert) {
+                    $success = "Account created successfully! You can now <a href='login.php'>login</a>.";
+                } else {
+                    $error = "Something went wrong. Please try again.";
+                }
+            }
+        } catch (PDOException $e) {
+            $error = "Database error: " . $e->getMessage();
+        }
+    }
+}
+?>
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
