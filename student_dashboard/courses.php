@@ -7,7 +7,8 @@ if (!isset($_SESSION['user_id']) || $_SESSION['user_type'] !== 'student') {
 }
 $student_name = $_SESSION['student_name'] ?? 'Student';
 
-include '../../includes/student_header.php';
+// Fixed include path - includes folder is at the root level
+include '../includes/student_header.php';
 
 ?>
 <!DOCTYPE html>
@@ -252,6 +253,12 @@ include '../../includes/student_header.php';
                 </div>
             </div>
         </div>
+
+        <!-- Add English tab content -->
+        <div id="english" class="tab-content">
+            <h2>English</h2>
+            <p>English content coming soon...</p>
+        </div>
     </div>
 
     <script>
@@ -327,19 +334,6 @@ include '../../includes/student_header.php';
                 else ctx.fillText("Impact!", 180, fallC.height - 10);
             }
             fall();
-        }
-
-        function openTab(evt, id) {
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-link').forEach(b => b.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            evt.currentTarget.classList.add('active');
-        }
-        function openSubTab(evt, id) {
-            document.querySelectorAll('.sub-content').forEach(s => s.classList.remove('active'));
-            document.querySelectorAll('.sub-link').forEach(b => b.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-            evt.currentTarget.classList.add('active');
         }
 
         function startVoiceInput() {
@@ -462,12 +456,11 @@ include '../../includes/student_header.php';
             speechSynthesis.speak(funcUtterance);
         }
 
-
-
     </script>
 </body>
 
 </html>
 <?php
-include '../../includes/student_footer.php';
+// Fixed include path - includes folder is at the root level
+include '../includes/student_footer.php';
 ?>
