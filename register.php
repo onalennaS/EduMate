@@ -1,3 +1,41 @@
+<?php
+require_once 'includes/auth.php';
+
+// If user is already logged in, redirect to home page
+if (isLoggedIn()) {
+    header("Location: index.php");
+    exit();
+}
+
+$error = '';
+$success = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = trim($_POST['username']);
+    $email = trim($_POST['email']);
+    $user_type = trim($_POST['user_type']);
+    $password = trim($_POST['password']);
+    $confirm_password = trim($_POST['confirm_password']);
+    
+    // Validate form data
+    if (empty($username) || empty($email) || empty($user_type) || empty($password) || empty($confirm_password)) {
+        $error = "All fields are required";
+    } elseif ($password !== $confirm_password) {
+        $error = "Passwords do not match";
+    } else {
+        // Register the user
+        $result = registerUser($username, $email, $password, $user_type);
+        
+        if ($result === true) {
+            // Registration successful
+            header("Location: login.php?registered=1");
+            exit();
+        } else {
+            $error = $result;
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -298,32 +336,42 @@
     </style>
 </head>
 <body>
+  
 
     <section class="auth-container">
         <div class="auth-form">
             <h2>Create an Account</h2>
             
-            <!-- Demo error message for illustration -->
-            <!-- <div class="error-message">Demo error message</div> -->
+            <?php if ($error): ?>
+                <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+            
+            <?php if ($success): ?>
+                <div class="success-message"><?php echo htmlspecialchars($success); ?></div>
+            <?php endif; ?>
             
             <form method="POST" action="" id="registerForm">
                 <div class="form-group">
                     <label for="username">Username</label>
-                    <input type="text" id="username" name="username" required>
+                    <input type="text" id="username" name="username" 
+                           value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>" 
+                           required>
                     <small>3-20 characters, letters, numbers, and underscores only</small>
                 </div>
                 
                 <div class="form-group">
                     <label for="email">Email</label>
-                    <input type="email" id="email" name="email" required>
+                    <input type="email" id="email" name="email" 
+                           value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
+                           required>
                 </div>
                 
                 <div class="form-group">
                     <label for="user_type">I am a:</label>
                     <select id="user_type" name="user_type" required>
                         <option value="">Select your role</option>
-                        <option value="student">Student</option>
-                        <option value="teacher">Teacher</option>
+                        <option value="student" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'student') ? 'selected' : ''; ?>>Student</option>
+                        <option value="teacher" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'teacher') ? 'selected' : ''; ?>>Teacher</option>
                     </select>
                 </div>
                 
