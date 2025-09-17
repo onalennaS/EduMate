@@ -3,9 +3,9 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 12, 2025 at 08:38 PM
+-- Generation Time: Sep 17, 2025 at 10:49 AM
 -- Server version: 10.4.32-MariaDB
--- PHP Version: 8.0.30
+-- PHP Version: 8.1.25
 
 SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
 START TRANSACTION;
@@ -89,41 +89,6 @@ CREATE TABLE `courses` (
 -- --------------------------------------------------------
 
 --
--- Table structure for table `course_materials`
---
-
-CREATE TABLE `course_materials` (
-  `id` int(11) NOT NULL,
-  `course_id` int(11) NOT NULL,
-  `material_title` varchar(200) NOT NULL,
-  `material_type` enum('document','video','audio','link','interactive') NOT NULL,
-  `file_path` varchar(500) DEFAULT NULL,
-  `external_url` varchar(500) DEFAULT NULL,
-  `description` text DEFAULT NULL,
-  `accessibility_features` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`accessibility_features`)),
-  `upload_date` timestamp NOT NULL DEFAULT current_timestamp(),
-  `is_active` tinyint(1) DEFAULT 1,
-  `order_index` int(4) DEFAULT 0
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `enrollments`
---
-
-CREATE TABLE `enrollments` (
-  `id` int(11) NOT NULL,
-  `student_id` int(11) NOT NULL,
-  `course_id` int(11) NOT NULL,
-  `enrollment_date` timestamp NOT NULL DEFAULT current_timestamp(),
-  `status` enum('active','inactive','completed','dropped') DEFAULT 'active',
-  `final_grade` decimal(5,2) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------------------------------------------
-
---
 -- Table structure for table `grades`
 --
 
@@ -199,7 +164,34 @@ INSERT INTO `subjects` (`id`, `subject_name`, `subject_code`, `category`, `appli
 (28, 'isiXhosa First Additional Language', 'XHOSAFAL', 'core', '[7,8,9,10,11,12]', 'isiXhosa as additional language', 1, '2025-09-09 21:45:20'),
 (29, 'Sesotho Home Language', 'SESOTHL', 'core', '[7,8,9,10,11,12]', 'Sesotho as home language', 1, '2025-09-09 21:45:20'),
 (30, 'Sesotho First Additional Language', 'SESOTFAL', 'core', '[7,8,9,10,11,12]', 'Sesotho as additional language', 1, '2025-09-09 21:45:20'),
-(31, 'kjjjkh', 'jijk', 'core', '[\"7\"]', '', 1, '2025-09-09 23:49:12');
+(31, 'kjjjkh', 'jijk', 'core', '[\"7\"]', '', 1, '2025-09-09 23:49:12'),
+(32, 'hgnh', 'H89', 'core', '[\"11\"]', 'j,n', 1, '2025-09-17 08:35:52');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `subject_enrollments`
+--
+
+CREATE TABLE `subject_enrollments` (
+  `id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `subject_id` int(11) NOT NULL,
+  `grade_at_enrollment` int(11) NOT NULL,
+  `status` enum('active','dropped','completed') DEFAULT 'active',
+  `enrollment_date` timestamp NOT NULL DEFAULT current_timestamp(),
+  `dropped_date` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `subject_enrollments`
+--
+
+INSERT INTO `subject_enrollments` (`id`, `student_id`, `subject_id`, `grade_at_enrollment`, `status`, `enrollment_date`, `dropped_date`, `created_at`, `updated_at`) VALUES
+(35, 2, 4, 10, 'active', '2025-09-17 07:55:37', NULL, '2025-09-17 07:55:37', '2025-09-17 07:55:37'),
+(36, 2, 15, 10, 'active', '2025-09-17 07:55:40', NULL, '2025-09-17 07:55:40', '2025-09-17 07:55:40');
 
 -- --------------------------------------------------------
 
@@ -233,13 +225,6 @@ CREATE TABLE `teacher_subjects` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `teacher_subjects`
---
-
-INSERT INTO `teacher_subjects` (`id`, `teacher_id`, `subject_id`, `created_at`) VALUES
-(7, 4, 15, '2025-09-10 00:40:47');
-
 -- --------------------------------------------------------
 
 --
@@ -265,7 +250,7 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`id`, `username`, `email`, `password`, `user_type`, `grade`, `accessibility_needs`, `profile_picture`, `full_name`, `created_at`, `last_login`) VALUES
-(2, 'ona', 'onalennahamese07@gmail.com', '$2y$10$/jvzwzKv7NV6hvQOMR6.KOIW/MWpe9cN/pKwmmhEmtwoqnCu8ed6C', 'student', 7, NULL, NULL, NULL, '2025-09-06 10:49:30', '2025-09-12 18:37:42'),
+(2, 'ona', 'onalennahamese07@gmail.com', '$2y$10$/jvzwzKv7NV6hvQOMR6.KOIW/MWpe9cN/pKwmmhEmtwoqnCu8ed6C', 'student', 10, NULL, NULL, NULL, '2025-09-06 10:49:30', '2025-09-17 08:38:03'),
 (4, 'Teacher', 'onalennahamese@gmail.com', '$2y$10$jOE4kObeYf1zvqlaMiIPt.vE8bN5TYVrHW85uBroiC8OznWdF7Yu6', 'teacher', NULL, NULL, NULL, NULL, '2025-09-09 23:09:43', '2025-09-10 00:41:18');
 
 --
@@ -297,22 +282,6 @@ ALTER TABLE `courses`
   ADD KEY `grade_id` (`grade_id`);
 
 --
--- Indexes for table `course_materials`
---
-ALTER TABLE `course_materials`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `course_id` (`course_id`);
-
---
--- Indexes for table `enrollments`
---
-ALTER TABLE `enrollments`
-  ADD PRIMARY KEY (`id`),
-  ADD UNIQUE KEY `unique_enrollment` (`student_id`,`course_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `course_id` (`course_id`);
-
---
 -- Indexes for table `grades`
 --
 ALTER TABLE `grades`
@@ -324,6 +293,15 @@ ALTER TABLE `grades`
 ALTER TABLE `subjects`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `subject_code` (`subject_code`);
+
+--
+-- Indexes for table `subject_enrollments`
+--
+ALTER TABLE `subject_enrollments`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_student_subject` (`student_id`,`subject_id`),
+  ADD KEY `student_id` (`student_id`),
+  ADD KEY `subject_id` (`subject_id`);
 
 --
 -- Indexes for table `submissions`
@@ -375,18 +353,6 @@ ALTER TABLE `courses`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `course_materials`
---
-ALTER TABLE `course_materials`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
--- AUTO_INCREMENT for table `enrollments`
---
-ALTER TABLE `enrollments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
-
---
 -- AUTO_INCREMENT for table `grades`
 --
 ALTER TABLE `grades`
@@ -396,7 +362,13 @@ ALTER TABLE `grades`
 -- AUTO_INCREMENT for table `subjects`
 --
 ALTER TABLE `subjects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=33;
+
+--
+-- AUTO_INCREMENT for table `subject_enrollments`
+--
+ALTER TABLE `subject_enrollments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
 
 --
 -- AUTO_INCREMENT for table `submissions`
@@ -408,13 +380,13 @@ ALTER TABLE `submissions`
 -- AUTO_INCREMENT for table `teacher_subjects`
 --
 ALTER TABLE `teacher_subjects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- Constraints for dumped tables
@@ -441,17 +413,11 @@ ALTER TABLE `courses`
   ADD CONSTRAINT `courses_ibfk_3` FOREIGN KEY (`grade_id`) REFERENCES `grades` (`id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `course_materials`
+-- Constraints for table `subject_enrollments`
 --
-ALTER TABLE `course_materials`
-  ADD CONSTRAINT `course_materials_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE;
-
---
--- Constraints for table `enrollments`
---
-ALTER TABLE `enrollments`
-  ADD CONSTRAINT `enrollments_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `enrollments_ibfk_2` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE;
+ALTER TABLE `subject_enrollments`
+  ADD CONSTRAINT `subject_enrollments_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `subject_enrollments_ibfk_2` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `submissions`
