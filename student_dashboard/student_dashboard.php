@@ -1,213 +1,187 @@
 <?php
-// student_dashboard/courses.php
+// student_dashboard/subjects.php
 session_start();
 
 // Include database connection
 require_once '../config/database.php';
 
-// Include the header
-include '../includes/student_header.php';
+// Check if user is logged in and get student_id
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../login.php");
+    exit;
+}
 
 $student_id = $_SESSION['user_id'];
 
 // Get student's grade
 $stmt = $pdo->prepare("SELECT grade FROM users WHERE id = ?");
 $stmt->execute([$student_id]);
-$student_grade = $stmt->fetch(PDO::FETCH_ASSOC)['grade'];
+$student_data = $stmt->fetch(PDO::FETCH_ASSOC);
+$student_grade = $student_data ? $student_data['grade'] : null;
 
-// Handle subject enrollment
-if ($_POST['action'] ?? '' === 'enroll_subject') {
+// Handle grade selection BEFORE including header
+if (($_POST['action'] ?? '') === 'set_grade') {
+    $selected_grade = $_POST['selected_grade'] ?? null;
+    
+    if ($selected_grade && is_numeric($selected_grade) && $selected_grade >= 1 && $selected_grade <= 12) {
+        // Update student's grade
+        $stmt = $pdo->prepare("UPDATE users SET grade = ? WHERE id = ?");
+        if ($stmt->execute([$selected_grade, $student_id])) {
+            // Update the local variable
+            $student_grade = $selected_grade;
+            $success_message = "Grade successfully set to Grade " . $student_grade . "!";
+        } else {
+            $error_message = "Failed to set grade. Please try again.";
+        }
+    } else {
+        $error_message = "Please select a valid grade (1-12).";
+    }
+}
+
+// Handle subject enrollment BEFORE including header
+if (($_POST['action'] ?? '') === 'enroll_subject') {
     $subject_id = $_POST['subject_id'] ?? null;
     
-    if ($subject_id) {
+    // First check if student has a grade set
+    if (!$student_grade) {
+        $error_message = "Please set your grade level first before enrolling in subjects.";
+    } elseif ($subject_id && is_numeric($subject_id)) {
         // Check if subject exists and is applicable to student's grade
         $stmt = $pdo->prepare("SELECT * FROM subjects WHERE id = ? AND JSON_CONTAINS(applicable_grades, ?) AND is_active = 1");
         $stmt->execute([$subject_id, json_encode((int)$student_grade)]);
         $subject = $stmt->fetch(PDO::FETCH_ASSOC);
         
         if ($subject) {
-            // Check if already enrolled in any course for this subject
-            $stmt = $pdo->prepare("SELECT e.id 
-                                   FROM enrollments e 
-                                   JOIN teacher_subjects c ON e.subject_id = c.id 
-                                   WHERE e.student_id = ? AND c.subject_id = ? AND e.status = 'active'");
+            // Check if already enrolled in this subject
+            $stmt = $pdo->prepare("SELECT id FROM subject_enrollments WHERE student_id = ? AND subject_id = ? AND status = 'active'");
             $stmt->execute([$student_id, $subject_id]);
             
             if ($stmt->fetch()) {
-                $error_message = "You are already enrolled in a course for this subject.";
+                $error_message = "You are already enrolled in this subject.";
             } else {
-                // Get available courses for this subject and grade
-                $stmt = $pdo->prepare("SELECT id FROM teacher_subjects 
-                                       WHERE subject_id = ? AND grade_id = (SELECT id FROM grades WHERE grade_number = ?) 
-                                       AND is_active = 1 LIMIT 1");
-                $stmt->execute([$subject_id, $student_grade]);
-                $course = $stmt->fetch(PDO::FETCH_ASSOC);
-                
-                if ($course) {
-                    // Enroll the student in the first available course for this subject
-                    $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active')");
-                    if ($stmt->execute([$student_id, $course['id']])) {
-                        $success_message = "Successfully enrolled in " . $subject['subject_name'];
-                    } else {
-                        $error_message = "Failed to enroll in subject. Please try again.";
-                    }
+                // Enroll the student in the subject
+                $stmt = $pdo->prepare("INSERT INTO subject_enrollments (student_id, subject_id, grade_at_enrollment, status, enrollment_date) VALUES (?, ?, ?, 'active', NOW())");
+                if ($stmt->execute([$student_id, $subject_id, $student_grade])) {
+                    $success_message = "Successfully enrolled in " . htmlspecialchars($subject['subject_name']) . "!";
                 } else {
-                    $error_message = "No available courses for this subject yet. Please check back later.";
+                    $error_message = "Failed to enroll in subject. Please try again.";
                 }
             }
         } else {
             $error_message = "Subject not found, inactive, or not available for your grade.";
         }
+    } else {
+        $error_message = "Invalid subject selected.";
     }
 }
 
-// Handle course enrollment
-if ($_POST['action'] ?? '' === 'enroll_course') {
-    $course_id = $_POST['course_id'] ?? null;
-    $enrollment_key = $_POST['enrollment_key'] ?? '';
+// Handle subject unenrollment BEFORE including header
+if (($_POST['action'] ?? '') === 'unenroll_subject') {
+    $subject_id = $_POST['subject_id'] ?? null;
     
-    if ($course_id) {
-        // Check if course exists and enrollment key matches (if required)
-        $stmt = $pdo->prepare("SELECT c.*, s.subject_name, g.grade_name 
-                               FROM courses c 
-                               JOIN subjects s ON c.subject_id = s.id 
-                               JOIN grades g ON c.grade_id = g.id 
-                               WHERE c.id = ? AND c.is_active = 1");
-        $stmt->execute([$course_id]);
-        $course = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($subject_id && is_numeric($subject_id)) {
+        // Get subject name for success message
+        $stmt = $pdo->prepare("SELECT s.subject_name FROM subjects s 
+                              JOIN subject_enrollments se ON s.id = se.subject_id 
+                              WHERE se.student_id = ? AND se.subject_id = ? AND se.status = 'active'");
+        $stmt->execute([$student_id, $subject_id]);
+        $subject_data = $stmt->fetch(PDO::FETCH_ASSOC);
         
-        if ($course) {
-            // Check if enrollment key is required and matches
-            if ($course['enrollment_key'] && $course['enrollment_key'] !== $enrollment_key) {
-                $error_message = "Invalid enrollment key for this course.";
+        if ($subject_data) {
+            $stmt = $pdo->prepare("UPDATE subject_enrollments SET status = 'dropped', dropped_date = NOW() WHERE student_id = ? AND subject_id = ? AND status = 'active'");
+            if ($stmt->execute([$student_id, $subject_id])) {
+                $success_message = "Successfully unenrolled from " . htmlspecialchars($subject_data['subject_name']) . ".";
             } else {
-                // Check if already enrolled
-                $stmt = $pdo->prepare("SELECT id FROM enrollments WHERE student_id = ? AND course_id = ?");
-                $stmt->execute([$student_id, $course_id]);
-                
-                if ($stmt->fetch()) {
-                    $error_message = "You are already enrolled in this course.";
-                } else {
-                    // Enroll the student
-                    $stmt = $pdo->prepare("INSERT INTO enrollments (student_id, course_id, status) VALUES (?, ?, 'active')");
-                    if ($stmt->execute([$student_id, $course_id])) {
-                        $success_message = "Successfully enrolled in " . $course['course_name'];
-                    } else {
-                        $error_message = "Failed to enroll in course. Please try again.";
-                    }
-                }
+                $error_message = "Failed to unenroll from subject.";
             }
         } else {
-            $error_message = "Course not found or inactive.";
+            $error_message = "Subject enrollment not found.";
         }
+    } else {
+        $error_message = "Invalid subject selected.";
     }
 }
 
-// Handle course unenrollment
-if ($_POST['action'] ?? '' === 'unenroll_course') {
-    $course_id = $_POST['course_id'] ?? null;
-    
-    if ($course_id) {
-        $stmt = $pdo->prepare("UPDATE enrollments SET status = 'dropped' WHERE student_id = ? AND course_id = ?");
-        if ($stmt->execute([$student_id, $course_id])) {
-            $success_message = "Successfully unenrolled from course.";
-        } else {
-            $error_message = "Failed to unenroll from course.";
-        }
-    }
-}
+// NOW include the header after all potential redirects
+include '../includes/student_header.php';
 
-// Get enrolled courses
-$stmt = $pdo->prepare("SELECT c.*, s.subject_name, s.subject_code, g.grade_name, u.full_name as teacher_name, u.username as teacher_username,
-                       COUNT(DISTINCT a.id) as total_assignments,
-                       COUNT(DISTINCT sub.id) as completed_assignments,
-                       AVG(sub.grade) as avg_grade
-                       FROM courses c
-                       JOIN subjects s ON c.subject_id = s.id
-                       JOIN grades g ON c.grade_id = g.id
-                       JOIN users u ON c.teacher_id = u.id
-                       JOIN enrollments e ON c.id = e.course_id
-                       LEFT JOIN assignments a ON c.id = a.course_id
-                       LEFT JOIN submissions sub ON a.id = sub.assignment_id AND sub.student_id = ?
-                       WHERE e.student_id = ? AND e.status = 'active' AND c.is_active = 1
-                       GROUP BY c.id
-                       ORDER BY s.subject_name, c.course_name");
-$stmt->execute([$student_id, $student_id]);
-$enrolled_courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
+// Re-fetch student grade in case it was updated
+$stmt = $pdo->prepare("SELECT grade FROM users WHERE id = ?");
+$stmt->execute([$student_id]);
+$student_data = $stmt->fetch(PDO::FETCH_ASSOC);
+$student_grade = $student_data ? $student_data['grade'] : null;
 
-// Get available subjects for student's grade
+// Get all available grades for selection
+$stmt = $pdo->prepare("SELECT * FROM grades ORDER BY grade_number ASC");
+$stmt->execute();
+$available_grades = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+// Get enrolled subjects
+$enrolled_subjects = [];
 if ($student_grade) {
-    $stmt = $pdo->prepare("SELECT s.*, 
-                          (SELECT COUNT(*) FROM courses c WHERE c.subject_id = s.id AND c.grade_id = (SELECT id FROM grades WHERE grade_number = ?) AND c.is_active = 1) as course_count
+    $stmt = $pdo->prepare("SELECT s.*, se.enrollment_date, se.grade_at_enrollment
+                           FROM subjects s
+                           JOIN subject_enrollments se ON s.id = se.subject_id
+                           WHERE se.student_id = ? AND se.status = 'active' AND s.is_active = 1
+                           ORDER BY s.category, s.subject_name");
+    $stmt->execute([$student_id]);
+    $enrolled_subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// Get available subjects for student's grade (not already enrolled)
+$available_subjects = [];
+if ($student_grade) {
+    $stmt = $pdo->prepare("SELECT s.*
                           FROM subjects s 
                           WHERE JSON_CONTAINS(s.applicable_grades, ?) AND s.is_active = 1
                           AND s.id NOT IN (
-                              SELECT c.subject_id FROM enrollments e 
-                              JOIN courses c ON e.course_id = c.id 
-                              WHERE e.student_id = ? AND e.status = 'active'
+                              SELECT subject_id FROM subject_enrollments 
+                              WHERE student_id = ? AND status = 'active'
                           )
                           ORDER BY s.category, s.subject_name");
-    $stmt->execute([$student_grade, json_encode((int)$student_grade), $student_id]);
+    $stmt->execute([json_encode((int)$student_grade), $student_id]);
     $available_subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $available_subjects = [];
 }
 
-// Get available courses for enrollment (not already enrolled)
-if ($student_grade) {
-    $stmt = $pdo->prepare("SELECT c.*, s.subject_name, s.subject_code, g.grade_name, u.full_name as teacher_name, u.username as teacher_username,
-                           COUNT(DISTINCT cm.id) as material_count
-                           FROM courses c
-                           JOIN subjects s ON c.subject_id = s.id
-                           JOIN grades g ON c.grade_id = g.id
-                           JOIN users u ON c.teacher_id = u.id
-                           LEFT JOIN course_materials cm ON c.id = cm.course_id AND cm.is_active = 1
-                           LEFT JOIN enrollments e ON c.id = e.course_id AND e.student_id = ?
-                           WHERE g.grade_number = ? AND c.is_active = 1 AND e.id IS NULL
-                           GROUP BY c.id
-                           ORDER BY s.subject_name, c.course_name");
-    $stmt->execute([$student_id, $student_grade]);
-    $available_courses = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} else {
-    $available_courses = [];
+// Handle success messages from redirects
+if (isset($_GET['grade_set']) && $_GET['grade_set'] == '1') {
+    $success_message = "Grade successfully set to Grade " . $student_grade . "!";
 }
 
-// Function to get progress percentage
-function getProgressPercentage($completed, $total) {
-    if ($total == 0) return 0;
-    return round(($completed / $total) * 100);
+if (isset($_GET['enrolled']) && $_GET['enrolled'] == '1' && isset($_GET['subject'])) {
+    $success_message = "Successfully enrolled in " . htmlspecialchars($_GET['subject']) . "!";
 }
 
-// Function to format grade display
-function formatGradeDisplay($grade) {
-    if ($grade === null) return 'N/A';
-    return number_format($grade, 1) . '%';
-}
-
-function getGradeClass($grade) {
-    if ($grade === null) return '';
-    if ($grade >= 70) return 'text-success';
-    if ($grade >= 60) return 'text-warning';
-    return 'text-danger';
+if (isset($_GET['unenrolled']) && $_GET['unenrolled'] == '1') {
+    $success_message = "Successfully unenrolled from subject.";
 }
 ?>
 
 <!-- Page Header -->
 <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-        <h1 class="h3 mb-0">My Courses</h1>
+        <h1 class="h3 mb-0">My Subjects</h1>
         <p class="text-muted mb-0">
             <?php if ($student_grade): ?>
-                Manage your Grade <?php echo $student_grade; ?> courses and explore new learning opportunities
+                Manage your Grade <?php echo $student_grade; ?> subjects
+                <br>
+                <button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="openGradeSelection()">
+                    <i class="fas fa-edit"></i> Change Grade Level
+                </button>
             <?php else: ?>
-                <a href="student_dashboard.php" class="text-decoration-none">Set your grade</a> to see available courses
+                <button class="btn btn-primary btn-sm" onclick="openGradeSelection()">
+                    <i class="fas fa-graduation-cap"></i> Set Your Grade
+                </button>
+                to see available subjects
             <?php endif; ?>
         </p>
     </div>
     <?php if ($student_grade): ?>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#enrollModal">
-        <i class="fas fa-plus"></i> Enroll in Course
-    </button>
+    <div class="d-flex gap-2">
+        <button class="btn btn-outline-secondary" onclick="openGradeSelection()" title="Change Grade Level">
+            <i class="fas fa-graduation-cap"></i> Grade <?php echo $student_grade; ?>
+        </button>
+    </div>
     <?php endif; ?>
 </div>
 
@@ -231,108 +205,94 @@ function getGradeClass($grade) {
 <div class="content-card">
     <div class="card-body text-center py-5">
         <i class="fas fa-graduation-cap text-primary mb-3" style="font-size: 4rem; opacity: 0.5;"></i>
-        <h4>Welcome to EDUMATE Courses</h4>
-        <p class="text-muted mb-4">To access courses tailored for your grade level, please set your grade first.</p>
-        <a href="student_dashboard.php" class="btn btn-primary btn-lg">
-            <i class="fas fa-arrow-left"></i> Set My Grade
-        </a>
+        <h4>Welcome to EDUMATE Subjects</h4>
+        <p class="text-muted mb-4">To access subjects tailored for your grade level, please set your grade first.</p>
+        <button class="btn btn-primary btn-lg" onclick="openGradeSelection()">
+            <i class="fas fa-graduation-cap"></i> Set My Grade
+        </button>
     </div>
 </div>
 <?php else: ?>
 
-<!-- Enrolled Courses Section -->
+<!-- Enrolled Subjects Section -->
 <div class="content-card mb-4">
     <div class="card-header-custom">
-        <i class="fas fa-book-open me-2"></i>My Enrolled Courses (<?php echo count($enrolled_courses); ?>)
+        <i class="fas fa-book-open me-2"></i>My Enrolled Subjects (<?php echo count($enrolled_subjects); ?>)
     </div>
     <div class="card-body">
-        <?php if (empty($enrolled_courses)): ?>
+        <?php if (empty($enrolled_subjects)): ?>
             <div class="text-center py-5">
                 <i class="fas fa-book text-muted mb-3" style="font-size: 4rem; opacity: 0.3;"></i>
-                <h5>No Enrolled Courses</h5>
-                <p class="text-muted mb-4">You haven't enrolled in any courses yet. Browse available subjects and courses below to start your learning journey!</p>
+                <h5>No Enrolled Subjects</h5>
+                <p class="text-muted mb-4">You haven't enrolled in any subjects yet. Browse available subjects below to start your learning journey!</p>
             </div>
         <?php else: ?>
             <div class="row">
-                <?php foreach ($enrolled_courses as $course): ?>
+                <?php foreach ($enrolled_subjects as $subject): ?>
                 <div class="col-lg-4 col-md-6 mb-4">
                     <div class="card h-100 border-0 shadow-sm">
-                        <!-- Course Header -->
-                        <div class="card-header bg-gradient" style="background: linear-gradient(135deg, var(--primary-neutral), var(--secondary-neutral));">
+                        <!-- Subject Header -->
+                        <div class="card-header bg-gradient" style="background: linear-gradient(135deg, 
+                            <?php 
+                            if ($subject['category'] === 'core') echo 'var(--success-color), var(--success-light)';
+                            elseif ($subject['category'] === 'elective') echo 'var(--primary-color), var(--primary-light)';
+                            else echo 'var(--warning-color), var(--warning-light)';
+                            ?>);">
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
-                                    <h6 class="text-white mb-1"><?php echo htmlspecialchars($course['subject_name']); ?></h6>
-                                    <small class="text-white-50"><?php echo htmlspecialchars($course['grade_name']); ?></small>
+                                    <h6 class="text-white mb-1"><?php echo htmlspecialchars($subject['subject_name']); ?></h6>
+                                    <small class="text-white-50">Grade <?php echo $subject['grade_at_enrollment']; ?></small>
                                 </div>
-                                <span class="badge bg-light text-dark"><?php echo htmlspecialchars($course['subject_code']); ?></span>
+                                <span class="badge bg-light text-dark"><?php echo htmlspecialchars($subject['subject_code']); ?></span>
                             </div>
                         </div>
                         
-                        <!-- Course Body -->
+                        <!-- Subject Body -->
                         <div class="card-body">
-                            <h5 class="card-title text-truncate" title="<?php echo htmlspecialchars($course['course_name']); ?>">
-                                <?php echo htmlspecialchars($course['course_name']); ?>
-                            </h5>
-                            
                             <p class="card-text text-muted small mb-3">
-                                <?php echo htmlspecialchars(substr($course['course_description'] ?? 'No description available.', 0, 100)); ?>
-                                <?php if (strlen($course['course_description'] ?? '') > 100): ?>...<?php endif; ?>
+                                <?php echo htmlspecialchars(substr($subject['description'] ?? 'No description available.', 0, 120)); ?>
+                                <?php if (strlen($subject['description'] ?? '') > 120): ?>...<?php endif; ?>
                             </p>
                             
-                            <!-- Progress Info -->
+                            <!-- Subject Info -->
                             <div class="row text-center mb-3">
-                                <div class="col-4">
-                                    <div class="small text-muted">Assignments</div>
-                                    <div class="fw-bold"><?php echo $course['total_assignments']; ?></div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="small text-muted">Completed</div>
-                                    <div class="fw-bold text-success"><?php echo $course['completed_assignments']; ?></div>
-                                </div>
-                                <div class="col-4">
-                                    <div class="small text-muted">Average</div>
-                                    <div class="fw-bold <?php echo getGradeClass($course['avg_grade']); ?>">
-                                        <?php echo formatGradeDisplay($course['avg_grade']); ?>
+                                <div class="col-6">
+                                    <div class="small text-muted">Category</div>
+                                    <div class="fw-bold text-capitalize">
+                                        <?php echo htmlspecialchars($subject['category']); ?>
                                     </div>
                                 </div>
-                            </div>
-                            
-                            <!-- Progress Bar -->
-                            <?php $progress = getProgressPercentage($course['completed_assignments'], $course['total_assignments']); ?>
-                            <div class="mb-3">
-                                <div class="d-flex justify-content-between align-items-center mb-1">
-                                    <small class="text-muted">Progress</small>
-                                    <small class="text-muted"><?php echo $progress; ?>%</small>
-                                </div>
-                                <div class="progress" style="height: 6px;">
-                                    <div class="progress-bar" role="progressbar" style="width: <?php echo $progress; ?>%" 
-                                         aria-valuenow="<?php echo $progress; ?>" aria-valuemin="0" aria-valuemax="100"></div>
+                                <div class="col-6">
+                                    <div class="small text-muted">Status</div>
+                                    <div class="fw-bold text-success">Enrolled</div>
                                 </div>
                             </div>
                             
-                            <!-- Teacher Info -->
+                            <!-- Enrollment Date -->
                             <div class="d-flex align-items-center mb-3">
                                 <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-2" 
                                      style="width: 32px; height: 32px;">
-                                    <i class="fas fa-user text-muted"></i>
+                                    <i class="fas fa-calendar text-muted"></i>
                                 </div>
                                 <div class="flex-grow-1">
                                     <div class="small fw-medium">
-                                        <?php echo htmlspecialchars($course['teacher_name'] ?? $course['teacher_username']); ?>
+                                        Enrolled: <?php echo date('M j, Y', strtotime($subject['enrollment_date'])); ?>
                                     </div>
-                                    <div class="small text-muted">Instructor</div>
+                                    <div class="small text-muted">
+                                        Active enrollment
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         
-                        <!-- Course Footer -->
+                        <!-- Subject Footer -->
                         <div class="card-footer bg-transparent">
                             <div class="d-flex gap-2">
-                                <a href="course_details.php?id=<?php echo $course['id']; ?>" class="btn btn-primary btn-sm flex-grow-1">
-                                    <i class="fas fa-eye"></i> View Course
-                                </a>
+                                <button class="btn btn-outline-primary btn-sm flex-grow-1" disabled>
+                                    <i class="fas fa-book"></i> Subject Details
+                                </button>
                                 <button class="btn btn-outline-danger btn-sm" 
-                                        onclick="confirmUnenroll(<?php echo $course['id']; ?>, '<?php echo htmlspecialchars($course['course_name'], ENT_QUOTES); ?>')">
+                                        onclick="confirmUnenrollSubject(<?php echo $subject['id']; ?>, '<?php echo htmlspecialchars($subject['subject_name'], ENT_QUOTES); ?>')">
                                     <i class="fas fa-times"></i>
                                 </button>
                             </div>
@@ -376,7 +336,7 @@ function getGradeClass($grade) {
                                 <p class="card-text small text-muted"><?php echo htmlspecialchars($subject['description']); ?></p>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="badge bg-success"><?php echo htmlspecialchars($subject['subject_code']); ?></span>
-                                    <span class="badge bg-info"><?php echo $subject['course_count']; ?> course(s)</span>
+                                    <span class="badge bg-secondary">Core Subject</span>
                                 </div>
                             </div>
                             <div class="card-footer bg-transparent">
@@ -407,7 +367,7 @@ function getGradeClass($grade) {
                                 <p class="card-text small text-muted"><?php echo htmlspecialchars($subject['description']); ?></p>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="badge bg-primary"><?php echo htmlspecialchars($subject['subject_code']); ?></span>
-                                    <span class="badge bg-info"><?php echo $subject['course_count']; ?> course(s)</span>
+                                    <span class="badge bg-secondary">Elective</span>
                                 </div>
                             </div>
                             <div class="card-footer bg-transparent">
@@ -438,7 +398,7 @@ function getGradeClass($grade) {
                                 <p class="card-text small text-muted"><?php echo htmlspecialchars($subject['description']); ?></p>
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="badge bg-warning"><?php echo htmlspecialchars($subject['subject_code']); ?></span>
-                                    <span class="badge bg-info"><?php echo $subject['course_count']; ?> course(s)</span>
+                                    <span class="badge bg-secondary">Practical</span>
                                 </div>
                             </div>
                             <div class="card-footer bg-transparent">
@@ -459,143 +419,146 @@ function getGradeClass($grade) {
         </div>
     </div>
 </div>
-<?php endif; ?>
-
-<!-- Available Courses Section -->
-<?php if (!empty($available_courses)): ?>
-<div class="content-card mb-4">
-    <div class="card-header-custom">
-        <i class="fas fa-search me-2"></i>Available Courses for Grade <?php echo $student_grade; ?> (<?php echo count($available_courses); ?>)
-    </div>
-    <div class="card-body">
-        <p class="text-muted mb-4">
-            Discover individual courses available for your grade level. These courses are created by teachers and aligned with the South African curriculum.
-        </p>
-        
-        <div class="row">
-            <?php foreach ($available_courses as $course): ?>
-            <div class="col-lg-4 col-md-6 mb-4">
-                <div class="card h-100 border-0 shadow-sm">
-                    <!-- Course Header -->
-                    <div class="card-header bg-light">
-                        <div class="d-flex justify-content-between align-items-start">
-                            <div>
-                                <h6 class="mb-1 text-dark"><?php echo htmlspecialchars($course['subject_name']); ?></h6>
-                                <small class="text-muted"><?php echo htmlspecialchars($course['grade_name']); ?></small>
-                            </div>
-                            <span class="badge bg-secondary"><?php echo htmlspecialchars($course['subject_code']); ?></span>
-                        </div>
-                    </div>
-                    
-                    <!-- Course Body -->
-                    <div class="card-body">
-                        <h5 class="card-title text-truncate" title="<?php echo htmlspecialchars($course['course_name']); ?>">
-                            <?php echo htmlspecialchars($course['course_name']); ?>
-                        </h5>
-                        
-                        <p class="card-text text-muted small mb-3">
-                            <?php echo htmlspecialchars(substr($course['course_description'] ?? 'No description available.', 0, 100)); ?>
-                            <?php if (strlen($course['course_description'] ?? '') > 100): ?>...<?php endif; ?>
-                        </p>
-                        
-                        <!-- Course Info -->
-                        <div class="row text-center mb-3">
-                            <div class="col-6">
-                                <div class="small text-muted">Materials</div>
-                                <div class="fw-bold"><?php echo $course['material_count']; ?></div>
-                            </div>
-                            <div class="col-6">
-                                <div class="small text-muted">Enrollment</div>
-                                <div class="fw-bold">
-                                    <?php echo $course['enrollment_key'] ? 'Key Required' : 'Open'; ?>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Teacher Info -->
-                        <div class="d-flex align-items-center mb-3">
-                            <div class="bg-primary bg-opacity-10 rounded-circle d-flex align-items-center justify-content-center me-2" 
-                                 style="width: 32px; height: 32px;">
-                                <i class="fas fa-chalkboard-teacher text-primary"></i>
-                            </div>
-                            <div class="flex-grow-1">
-                                <div class="small fw-medium">
-                                    <?php echo htmlspecialchars($course['teacher_name'] ?? $course['teacher_username']); ?>
-                                </div>
-                                <div class="small text-muted">Instructor</div>
-                            </div>
-                        </div>
-                        
-                        <!-- Course Code -->
-                        <div class="small text-muted mb-2">
-                            Course Code: <code><?php echo htmlspecialchars($course['course_code']); ?></code>
-                        </div>
-                    </div>
-                    
-                    <!-- Course Footer -->
-                    <div class="card-footer bg-transparent">
-                        <button class="btn btn-success w-100" 
-                                onclick="enrollInCourse(<?php echo $course['id']; ?>, '<?php echo htmlspecialchars($course['course_name'], ENT_QUOTES); ?>', <?php echo $course['enrollment_key'] ? 'true' : 'false'; ?>)">
-                            <i class="fas fa-plus"></i> Enroll Now
-                        </button>
-                    </div>
-                </div>
-            </div>
-            <?php endforeach; ?>
-        </div>
-    </div>
-</div>
 <?php else: ?>
-    <?php if (empty($available_subjects)): ?>
     <div class="content-card mb-4">
         <div class="card-header-custom">
-            <i class="fas fa-search me-2"></i>Available Courses
+            <i class="fas fa-search me-2"></i>Available Subjects
         </div>
         <div class="card-body text-center py-5">
             <i class="fas fa-book-open text-muted mb-3" style="font-size: 4rem; opacity: 0.3;"></i>
-            <h5>No Available Courses or Subjects</h5>
+            <h5>No Available Subjects</h5>
             <p class="text-muted mb-4">
-                There are currently no available courses or subjects for Grade <?php echo $student_grade; ?>. 
-                Please check back later or contact your teachers.
+                There are currently no available subjects for Grade <?php echo $student_grade; ?>. 
+                Please check back later or contact your administrators.
             </p>
         </div>
     </div>
-    <?php endif; ?>
 <?php endif; ?>
 
 <?php endif; ?>
 
-<!-- Enrollment Modal -->
-<div class="modal fade" id="enrollModal" tabindex="-1" aria-labelledby="enrollModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
+<!-- Grade Selection Modal -->
+<div class="modal fade" id="gradeSelectionModal" tabindex="-1" aria-labelledby="gradeSelectionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="enrollModalLabel">
-                    <i class="fas fa-plus-circle"></i> Enroll in Course
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="gradeSelectionModalLabel">
+                    <i class="fas fa-graduation-cap"></i> Select Your Grade Level
                 </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <?php if ($student_grade): ?>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <?php endif; ?>
             </div>
-            <form method="POST">
-                <input type="hidden" name="action" value="enroll_course">
-                <input type="hidden" name="course_id" id="modal_course_id">
+            <form method="POST" id="gradeSelectionForm">
+                <input type="hidden" name="action" value="set_grade">
                 
                 <div class="modal-body">
-                    <div id="course_info" class="mb-3"></div>
-                    
-                    <div id="enrollment_key_section" style="display: none;">
-                        <label for="enrollment_key" class="form-label">Enrollment Key</label>
-                        <input type="text" class="form-control" id="enrollment_key" name="enrollment_key" 
-                               placeholder="Enter enrollment key provided by your teacher">
-                        <div class="form-text">
-                            Ask your teacher for the enrollment key to access this course.
+                    <div class="row mb-4">
+                        <div class="col-md-8">
+                            <h6 class="text-primary mb-3">Choose Your Current Grade</h6>
+                            <p class="text-muted mb-4">
+                                Select your current grade level to access subjects tailored for you. 
+                                This helps us show you the most relevant learning materials aligned with the South African curriculum.
+                            </p>
+                        </div>
+                        <div class="col-md-4 text-center">
+                            <i class="fas fa-school text-primary mb-2" style="font-size: 4rem; opacity: 0.3;"></i>
                         </div>
                     </div>
+                    
+                    <!-- Primary School (Grades 1-7) -->
+                    <div class="mb-4">
+                        <h6 class="text-success mb-3">
+                            <i class="fas fa-child me-2"></i>Primary School (Foundation & Intermediate Phase)
+                        </h6>
+                        <div class="row">
+                            <?php foreach ($available_grades as $grade): ?>
+                                <?php if ($grade['grade_number'] >= 1 && $grade['grade_number'] <= 7): ?>
+                                <div class="col-lg-3 col-md-4 col-6 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input grade-radio" type="radio" name="selected_grade" 
+                                               value="<?php echo $grade['grade_number']; ?>" 
+                                               id="grade<?php echo $grade['grade_number']; ?>"
+                                               <?php echo ($student_grade == $grade['grade_number']) ? 'checked' : ''; ?>>
+                                        <label class="form-check-label w-100" for="grade<?php echo $grade['grade_number']; ?>">
+                                            <div class="card grade-card h-100 <?php echo ($student_grade == $grade['grade_number']) ? 'border-success bg-success bg-opacity-10' : ''; ?>">
+                                                <div class="card-body text-center py-3">
+                                                    <div class="fs-4 text-success mb-2">
+                                                        <i class="fas fa-seedling"></i>
+                                                    </div>
+                                                    <div class="fw-bold"><?php echo htmlspecialchars($grade['grade_name']); ?></div>
+                                                    <div class="small text-muted">
+                                                        <?php echo ($grade['grade_number'] <= 3) ? 'Foundation' : 'Intermediate'; ?>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    
+                    <!-- High School (Grades 8-12) -->
+                    <div class="mb-4">
+                        <h6 class="text-primary mb-3">
+                            <i class="fas fa-user-graduate me-2"></i>High School (Senior Phase & FET Phase)
+                        </h6>
+                        <div class="row">
+                            <?php foreach ($available_grades as $grade): ?>
+                                <?php if ($grade['grade_number'] >= 8 && $grade['grade_number'] <= 12): ?>
+                                <div class="col-lg-3 col-md-4 col-6 mb-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input grade-radio" type="radio" name="selected_grade" 
+                                               value="<?php echo $grade['grade_number']; ?>" 
+                                               id="grade<?php echo $grade['grade_number']; ?>"
+                                               <?php echo ($student_grade == $grade['grade_number']) ? 'checked' : ''; ?>>
+                                        <label class="form-check-label w-100" for="grade<?php echo $grade['grade_number']; ?>">
+                                            <div class="card grade-card h-100 <?php echo ($student_grade == $grade['grade_number']) ? 'border-primary bg-primary bg-opacity-10' : ''; ?>">
+                                                <div class="card-body text-center py-3">
+                                                    <div class="fs-4 text-primary mb-2">
+                                                        <?php if ($grade['grade_number'] <= 9): ?>
+                                                            <i class="fas fa-book"></i>
+                                                        <?php else: ?>
+                                                            <i class="fas fa-graduation-cap"></i>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                    <div class="fw-bold"><?php echo htmlspecialchars($grade['grade_name']); ?></div>
+                                                    <div class="small text-muted">
+                                                        <?php echo ($grade['grade_number'] <= 9) ? 'Senior Phase' : 'FET Phase'; ?>
+                                                    </div>
+                                                    <?php if ($grade['grade_number'] == 12): ?>
+                                                        <div class="small text-warning mt-1">
+                                                            <i class="fas fa-star"></i> Matric
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </div>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                        </div>
+                    </div>
+                    
+                    <?php if ($student_grade): ?>
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Current Grade:</strong> Grade <?php echo $student_grade; ?>
+                        <br><small>You can change your grade selection at any time, but this will affect which subjects are available to you.</small>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-success">
-                        <i class="fas fa-check"></i> Confirm Enrollment
+                    <?php if ($student_grade): ?>
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <?php endif; ?>
+                    <button type="submit" class="btn btn-primary" id="setGradeBtn" disabled>
+                        <i class="fas fa-check"></i> 
+                        <?php echo $student_grade ? 'Update Grade' : 'Set My Grade'; ?>
                     </button>
                 </div>
             </form>
@@ -604,91 +567,99 @@ function getGradeClass($grade) {
 </div>
 
 <!-- Unenrollment Form (Hidden) -->
-<form id="unenrollForm" method="POST" style="display: none;">
-    <input type="hidden" name="action" value="unenroll_course">
-    <input type="hidden" name="course_id" id="unenroll_course_id">
+<form id="unenrollSubjectForm" method="POST" style="display: none;">
+    <input type="hidden" name="action" value="unenroll_subject">
+    <input type="hidden" name="subject_id" id="unenroll_subject_id">
 </form>
 
 <script>
-function enrollInCourse(courseId, courseName, requiresKey) {
-    document.getElementById('modal_course_id').value = courseId;
+// Grade selection functionality
+document.addEventListener('DOMContentLoaded', function() {
+    const gradeRadios = document.querySelectorAll('.grade-radio');
+    const setGradeBtn = document.getElementById('setGradeBtn');
+    const gradeCards = document.querySelectorAll('.grade-card');
     
-    // Update course info in modal
-    document.getElementById('course_info').innerHTML = `
-        <div class="alert alert-info">
-            <i class="fas fa-info-circle"></i>
-            <strong>Course:</strong> ${courseName}
-            <br><small class="text-muted">You are about to enroll in this course.</small>
-        </div>
-    `;
+    // Enable submit button when a grade is selected
+    gradeRadios.forEach(radio => {
+        radio.addEventListener('change', function() {
+            setGradeBtn.disabled = false;
+            
+            // Update card styling
+            gradeCards.forEach(card => {
+                card.classList.remove('border-success', 'bg-success', 'bg-opacity-10', 'border-primary', 'bg-primary');
+            });
+            
+            const selectedCard = this.closest('.form-check').querySelector('.grade-card');
+            if (this.value <= 7) {
+                selectedCard.classList.add('border-success', 'bg-success', 'bg-opacity-10');
+            } else {
+                selectedCard.classList.add('border-primary', 'bg-primary', 'bg-opacity-10');
+            }
+        });
+    });
     
-    // Show/hide enrollment key section
-    const keySection = document.getElementById('enrollment_key_section');
-    if (requiresKey) {
-        keySection.style.display = 'block';
-        document.getElementById('enrollment_key').required = true;
-    } else {
-        keySection.style.display = 'none';
-        document.getElementById('enrollment_key').required = false;
-        document.getElementById('enrollment_key').value = '';
-    }
-    
-    // Show modal
-    const modal = new bootstrap.Modal(document.getElementById('enrollModal'));
-    modal.show();
+    // Show modal automatically if no grade is set
+    <?php if (!$student_grade): ?>
+    const gradeModal = new bootstrap.Modal(document.getElementById('gradeSelectionModal'), {
+        backdrop: 'static',
+        keyboard: false
+    });
+    gradeModal.show();
+    <?php endif; ?>
+});
+
+function openGradeSelection() {
+    const gradeModal = new bootstrap.Modal(document.getElementById('gradeSelectionModal'));
+    gradeModal.show();
 }
 
-function confirmUnenroll(courseId, courseName) {
-    Swal.fire({
-        title: 'Unenroll from Course?',
-        text: `Are you sure you want to unenroll from "${courseName}"? You will lose access to all course materials and assignments.`,
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#dc3545',
-        cancelButtonColor: '#6c757d',
-        confirmButtonText: 'Yes, Unenroll',
-        cancelButtonText: 'Cancel'
-    }).then((result) => {
-        if (result.isConfirmed) {
-            document.getElementById('unenroll_course_id').value = courseId;
-            document.getElementById('unenrollForm').submit();
+function confirmUnenrollSubject(subjectId, subjectName) {
+    if (typeof Swal !== 'undefined') {
+        Swal.fire({
+            title: 'Unenroll from Subject?',
+            text: `Are you sure you want to unenroll from "${subjectName}"? You will lose access to all materials in this subject.`,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonColor: '#dc3545',
+            cancelButtonColor: '#6c757d',
+            confirmButtonText: 'Yes, Unenroll',
+            cancelButtonText: 'Cancel'
+        }).then((result) => {
+            if (result.isConfirmed) {
+                document.getElementById('unenroll_subject_id').value = subjectId;
+                document.getElementById('unenrollSubjectForm').submit();
+            }
+        });
+    } else {
+        // Fallback for when SweetAlert is not available
+        if (confirm(`Are you sure you want to unenroll from "${subjectName}"? You will lose access to all materials in this subject.`)) {
+            document.getElementById('unenroll_subject_id').value = subjectId;
+            document.getElementById('unenrollSubjectForm').submit();
         }
-    });
+    }
 }
 
 function pageInit() {
-    console.log('Courses page loaded');
+    console.log('Subjects page loaded');
     
     // Announce page load for screen readers
     if (document.body.getAttribute('data-screen-reader') === 'true') {
         setTimeout(() => {
-            const enrolledCount = <?php echo count($enrolled_courses); ?>;
-            const availableCount = <?php echo count($available_courses); ?>;
-            const subjectCount = <?php echo count($available_subjects); ?>;
-            announceToScreenReader(`Courses page loaded. You have ${enrolledCount} enrolled courses, ${subjectCount} available subjects, and ${availableCount} available courses.`);
+            const enrolledCount = <?php echo count($enrolled_subjects); ?>;
+            const availableCount = <?php echo count($available_subjects); ?>;
+            
+            <?php if (!$student_grade): ?>
+            announceToScreenReader('Grade selection required. Please select your grade level to access subjects.');
+            <?php else: ?>
+            announceToScreenReader(`Subjects page loaded. You have ${enrolledCount} enrolled subjects and ${availableCount} available subjects.`);
+            <?php endif; ?>
         }, 1000);
     }
-    
-    // Auto-focus enrollment key input when modal shows
-    document.getElementById('enrollModal').addEventListener('shown.bs.modal', function() {
-        const keyInput = document.getElementById('enrollment_key');
-        if (keyInput.style.display !== 'none' && keyInput.offsetParent !== null) {
-            keyInput.focus();
-        }
-    });
 }
-
-// Clear modal data when hidden
-document.getElementById('enrollModal').addEventListener('hidden.bs.modal', function() {
-    document.getElementById('modal_course_id').value = '';
-    document.getElementById('enrollment_key').value = '';
-    document.getElementById('course_info').innerHTML = '';
-    document.getElementById('enrollment_key_section').style.display = 'none';
-});
 </script>
 
 <style>
-/* Course card hover effects */
+/* Subject card hover effects */
 .card {
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
@@ -698,14 +669,50 @@ document.getElementById('enrollModal').addEventListener('hidden.bs.modal', funct
     box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15) !important;
 }
 
-/* Progress bar animation */
-.progress-bar {
-    transition: width 0.6s ease;
+/* Grade selection styles */
+.grade-card {
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.grade-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+}
+
+.form-check-input:checked + .form-check-label .grade-card {
+    transform: scale(1.02);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.form-check {
+    margin: 0;
+}
+
+.form-check-label {
+    cursor: pointer;
+}
+
+.form-check-input {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Category-based gradient colors */
+:root {
+    --success-color: #198754;
+    --success-light: #d1e7dd;
+    --primary-color: #0d6efd;
+    --primary-light: #cfe2ff;
+    --warning-color: #ffc107;
+    --warning-light: #fff3cd;
 }
 
 /* Accessibility improvements */
 .card:focus-within {
-    outline: 2px solid var(--primary-neutral);
+    outline: 2px solid var(--primary-color);
     outline-offset: 2px;
 }
 
@@ -718,13 +725,26 @@ document.getElementById('enrollModal').addEventListener('hidden.bs.modal', funct
     border: 1px solid #000 !important;
 }
 
+.high-contrast .grade-card {
+    border: 2px solid #000 !important;
+}
+
+.high-contrast .form-check-input:checked + .form-check-label .grade-card {
+    background-color: #ffff00 !important;
+    color: #000 !important;
+}
+
 /* Reduced motion */
 .reduced-motion .card {
     transition: none !important;
 }
 
-.reduced-motion .progress-bar {
+.reduced-motion .grade-card {
     transition: none !important;
+}
+
+.reduced-motion .form-check-input:checked + .form-check-label .grade-card {
+    transform: none !important;
 }
 
 /* Mobile responsive adjustments */
@@ -735,6 +755,14 @@ document.getElementById('enrollModal').addEventListener('hidden.bs.modal', funct
     
     .row.text-center > div {
         margin-bottom: 0.5rem;
+    }
+    
+    .grade-card .card-body {
+        padding: 0.75rem 0.5rem;
+    }
+    
+    .grade-card .fs-4 {
+        font-size: 1.25rem !important;
     }
 }
 </style>

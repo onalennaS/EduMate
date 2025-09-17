@@ -373,10 +373,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo ($current_page == 'manage_courses.php') ? 'active' : ''; ?>" 
-                       href="manage_courses.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Manage Courses">
+                    <a class="nav-link <?php echo ($current_page == 'manage_subjects.php') ? 'active' : ''; ?>" 
+                       href="manage_subjects.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Manage Subjects">
                         <i class="fas fa-book-open"></i>
-                        <span>Manage Courses</span>
+                        <span>Manage Subjects</span>
                     </a>
                 </li>
                 <li class="nav-item">

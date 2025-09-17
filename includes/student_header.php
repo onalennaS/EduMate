@@ -369,9 +369,9 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
                 </li>
                 <li class="nav-item">
                     <a class="nav-link <?php echo ($current_page === 'courses') ? 'active' : ''; ?>" 
-                       href="courses.php" data-bs-toggle="tooltip" data-bs-placement="right" title="My Courses">
+                       href="subjects.php" data-bs-toggle="tooltip" data-bs-placement="right" title="My subjects">
                         <i class="fas fa-book"></i>
-                        <span>My Courses</span>
+                        <span>My Subjects</span>
                     </a>
                 </li>
                 <li class="nav-item">

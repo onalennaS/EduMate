@@ -1,3 +1,100 @@
+<?php
+// Start session
+session_start();
+
+// Initialize variables
+$error = '';
+$success = '';
+
+// Database configuration - UPDATE THESE WITH YOUR ACTUAL DATABASE CREDENTIALS
+$host = 'localhost';
+$dbname = 'edumate_db'; // Your database name
+$username = 'root';   // Your database username
+$password = '';       // Your database password
+
+// Create database connection
+try {
+    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+} catch(PDOException $e) {
+    $error = "Connection failed: " . $e->getMessage();
+}
+
+// Process form submission
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
+    // Get form data
+    $username = trim($_POST['username']);
+    $email = trim($_POST['email']);
+    $user_type = $_POST['user_type'];
+    $password = $_POST['password'];
+    $confirm_password = $_POST['confirm_password'];
+    
+    // Validation
+    if (empty($username) || empty($email) || empty($user_type) || empty($password) || empty($confirm_password)) {
+        $error = "All fields are required.";
+    }
+    
+    // Username validation
+    elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
+        $error = "Username must be 3-20 characters long and contain only letters, numbers, and underscores.";
+    }
+    
+    // Email validation
+    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Please enter a valid email address.";
+    }
+    
+    // Password validation
+    elseif (strlen($password) < 6) {
+        $error = "Password must be at least 6 characters long.";
+    }
+    
+    // Password confirmation
+    elseif ($password !== $confirm_password) {
+        $error = "Passwords do not match.";
+    }
+    
+    // User type validation
+    elseif (!in_array($user_type, ['student', 'teacher'])) {
+        $error = "Please select a valid user type.";
+    }
+    
+    else {
+        try {
+            // Check if username already exists
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+            $stmt->execute([$username]);
+            if ($stmt->rowCount() > 0) {
+                $error = "Username already exists. Please choose a different username.";
+            }
+            
+            // Check if email already exists
+            else {
+                $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+                $stmt->execute([$email]);
+                if ($stmt->rowCount() > 0) {
+                    $error = "Email already exists. Please use a different email address.";
+                }
+                
+                // If no errors, create the user
+                else {
+                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                    
+                    $stmt = $pdo->prepare("INSERT INTO users (username, email, user_type, password, created_at) VALUES (?, ?, ?, ?, NOW())");
+                    $stmt->execute([$username, $email, $user_type, $hashed_password]);
+                    
+                    $success = "Account created successfully! You can now <a href='login.php'>login</a>.";
+                    
+                    // Clear form data on success
+                    $_POST = array();
+                }
+            }
+        } catch(PDOException $e) {
+            $error = "Registration failed: " . $e->getMessage();
+        }
+    }
+}
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -146,7 +243,7 @@
             border-radius: 12px;
         }
 
-        /* Auth Container - UPDATED */
+        /* Auth Container */
         .auth-container {
             min-height: 80vh;
             display: flex;
@@ -165,28 +262,27 @@
                 0 20px 50px rgba(0, 0, 0, 0.1),
                 0 2px 10px rgba(0, 0, 0, 0.05);
             width: 100%;
-            max-width: 520px; /* Increased from 420px */
+            max-width: 520px;
             border: 1px solid rgba(255, 255, 255, 0.3);
         }
 
-        /* UPDATED: Compact header styling */
         .auth-form h2 {
             text-align: center;
-            margin-bottom: 1.5rem; /* Reduced from 2.5rem */
+            margin-bottom: 1.5rem;
             background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            font-size: 1.8rem; /* Reduced from 2.2rem */
+            font-size: 1.8rem;
             font-weight: 800;
-            display: inline-block; /* Makes it take only necessary width */
+            display: inline-block;
             width: 100%;
-            white-space: nowrap; /* Keeps it on one line */
+            white-space: nowrap;
         }
 
         /* Form Styles */
         .form-group {
-            margin-bottom: 1.5rem; /* Slightly reduced */
+            margin-bottom: 1.5rem;
         }
 
         .form-group label {
@@ -200,7 +296,7 @@
         .form-group input,
         .form-group select {
             width: 100%;
-            padding: 1rem; /* Slightly reduced padding */
+            padding: 1rem;
             border: 2px solid #e2e8f0;
             border-radius: 12px;
             font-size: 1rem;
@@ -265,7 +361,7 @@
             .auth-form {
                 margin: 1rem;
                 padding: 2rem 1.5rem;
-                max-width: 450px; /* Slightly wider on mobile too */
+                max-width: 450px;
             }
             
             .auth-form h2 {
@@ -278,7 +374,6 @@
             }
         }
 
-        /* Additional styling for better layout */
         .login-link {
             margin-top: 1.5rem;
             text-align: center;
@@ -298,8 +393,6 @@
     </style>
 </head>
 <body>
-  
-
     <section class="auth-container">
         <div class="auth-form">
             <h2>Create an Account</h2>
@@ -309,7 +402,7 @@
             <?php endif; ?>
             
             <?php if ($success): ?>
-                <div class="success-message"><?php echo htmlspecialchars($success); ?></div>
+                <div class="success-message"><?php echo $success; ?></div>
             <?php endif; ?>
             
             <form method="POST" action="" id="registerForm">
