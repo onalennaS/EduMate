@@ -1,11 +1,18 @@
 <?php
+// Start session
 session_start();
 
+// Initialize variables
 $error = '';
 $success = '';
 
-include 'includes/auth.php';
+// Database configuration - UPDATE THESE WITH YOUR ACTUAL DATABASE CREDENTIALS
+$host = 'localhost';
+$dbname = 'edumate_db'; // Your database name
+$username = 'root';   // Your database username
+$password = '';       // Your database password
 
+// Create database connection
 try {
     $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
     $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -13,42 +20,74 @@ try {
     $error = "Connection failed: " . $e->getMessage();
 }
 
-// Handle form
+// Process form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
+    // Get form data
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
     $user_type = $_POST['user_type'];
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
-
+    
     // Validation
     if (empty($username) || empty($email) || empty($user_type) || empty($password) || empty($confirm_password)) {
         $error = "All fields are required.";
-    } elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
-        $error = "Username must be 3-20 characters, only letters, numbers, underscores.";
-    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "Invalid email address.";
-    } elseif (strlen($password) < 8 || 
-              !preg_match('/[A-Z]/', $password) ||
-              !preg_match('/[0-9]/', $password) ||
-              !preg_match('/[\W]/', $password)) {
-        $error = "Password must be 8+ chars, include uppercase, number, and symbol.";
-    } elseif ($password !== $confirm_password) {
+    }
+    
+    // Username validation
+    elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
+        $error = "Username must be 3-20 characters long and contain only letters, numbers, and underscores.";
+    }
+    
+    // Email validation
+    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Please enter a valid email address.";
+    }
+    
+    // Password validation
+    elseif (strlen($password) < 6) {
+        $error = "Password must be at least 6 characters long.";
+    }
+    
+    // Password confirmation
+    elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
-    } elseif (!in_array($user_type, ['student', 'teacher'])) {
-        $error = "Please select a valid role.";
-    } else {
+    }
+    
+    // User type validation
+    elseif (!in_array($user_type, ['student', 'teacher'])) {
+        $error = "Please select a valid user type.";
+    }
+    
+    else {
         try {
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
-            $stmt->execute([$username, $email]);
+            // Check if username already exists
+            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
+            $stmt->execute([$username]);
             if ($stmt->rowCount() > 0) {
-                $error = "Username or email already exists.";
-            } else {
-                $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                $stmt = $pdo->prepare("INSERT INTO users (username, email, user_type, password, created_at) VALUES (?, ?, ?, ?, NOW())");
-                $stmt->execute([$username, $email, $user_type, $hashed_password]);
-                $success = "Account created successfully! <a href='login.php'>Login</a>";
-                $_POST = [];
+                $error = "Username already exists. Please choose a different username.";
+            }
+            
+            // Check if email already exists
+            else {
+                $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+                $stmt->execute([$email]);
+                if ($stmt->rowCount() > 0) {
+                    $error = "Email already exists. Please use a different email address.";
+                }
+                
+                // If no errors, create the user
+                else {
+                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+                    
+                    $stmt = $pdo->prepare("INSERT INTO users (username, email, user_type, password, created_at) VALUES (?, ?, ?, ?, NOW())");
+                    $stmt->execute([$username, $email, $user_type, $hashed_password]);
+                    
+                    $success = "Account created successfully! You can now <a href='login.php'>login</a>.";
+                    
+                    // Clear form data on success
+                    $_POST = array();
+                }
             }
         } catch(PDOException $e) {
             $error = "Registration failed: " . $e->getMessage();
@@ -56,186 +95,400 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
     }
 }
 ?>
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Register - EduMate</title>
-  <style>
-    /* Background */
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background: linear-gradient(135deg, #1e293b 0%, #334155 40%, #f1f5f9 100%);
-      min-height: 100vh;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      margin: 0;
-    }
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register - EduMate</title>
+    <style>
+        /* Reset and base styles */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    /* Auth container */
-    .auth-container {
-      width: 100%;
-      max-width: 380px; /* tighter width */
-      background: rgba(255, 255, 255, 0.9);
-      backdrop-filter: blur(15px);
-      padding: 2rem;
-      border-radius: 18px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
-    }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #2d3748;
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 30%, #f1f5f9 100%);
+            min-height: 100vh;
+        }
 
-    .auth-container h2 {
-      text-align: center;
-      margin-bottom: 1.5rem;
-      font-size: 1.6rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, #3b82f6, #06b6d4);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
+        /* Header and Navigation */
+        header {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
+            color: white;
+            padding: 1rem 0;
+            box-shadow: 0 8px 32px rgba(30, 41, 59, 0.15);
+            position: relative;
+            overflow: hidden;
+        }
 
-    /* Form */
-    .form-group {
-      margin-bottom: 1.2rem;
-    }
+        header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="0.5" fill="rgba(255,255,255,0.03)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
+            pointer-events: none;
+        }
 
-    .form-group label {
-      font-size: 0.9rem;
-      font-weight: 600;
-      color: #1e293b;
-      margin-bottom: 0.4rem;
-      display: block;
-    }
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 1;
+        }
 
-    .form-group input,
-    .form-group select {
-      width: 100%;
-      padding: 0.8rem;
-      font-size: 0.9rem;
-      border: 2px solid #e2e8f0;
-      border-radius: 10px;
-      background: #fff;
-      transition: all 0.3s ease;
-    }
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
 
-    .form-group input:focus,
-    .form-group select:focus {
-      border-color: #3b82f6;
-      outline: none;
-      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
-    }
+        nav ul {
+            display: flex;
+            list-style: none;
+            gap: 2rem;
+        }
 
-    .btn {
-      width: 100%;
-      padding: 0.9rem;
-      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-      border: none;
-      border-radius: 10px;
-      font-size: 1rem;
-      font-weight: 600;
-      color: #fff;
-      cursor: pointer;
-      transition: transform 0.2s ease, background 0.3s ease;
-    }
+        nav a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+            transition: all 0.3s ease;
+            position: relative;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
 
-    .btn:hover {
-      transform: translateY(-2px);
-      background: linear-gradient(135deg, #2563eb, #1e40af);
-    }
+        nav a:hover {
+            background: rgba(59, 130, 246, 0.1);
+            color: #60a5fa;
+            transform: translateY(-2px);
+        }
 
-    /* Messages */
-    .error-message,
-    .success-message {
-      margin-bottom: 1rem;
-      padding: 0.9rem 1rem;
-      border-radius: 10px;
-      font-size: 0.9rem;
-    }
-    .error-message {
-      background: #fee2e2;
-      color: #dc2626;
-      border-left: 4px solid #ef4444;
-    }
-    .success-message {
-      background: #dcfce7;
-      color: #16a34a;
-      border-left: 4px solid #22c55e;
-    }
+        nav a::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 50%;
+            width: 0;
+            height: 2px;
+            background: linear-gradient(90deg, #3b82f6, #06b6d4);
+            transition: all 0.3s ease;
+            transform: translateX(-50%);
+        }
 
-    /* Login link */
-    .login-link {
-      margin-top: 1rem;
-      text-align: center;
-      font-size: 0.9rem;
-    }
-    .login-link a {
-      color: #3b82f6;
-      text-decoration: none;
-      font-weight: 600;
-    }
-    .login-link a:hover {
-      color: #1d4ed8;
-    }
-  </style>
+        nav a:hover::after {
+            width: 80%;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-block;
+            padding: 0.7rem 1.3rem;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.35);
+        }
+
+        .btn-large {
+            padding: 1rem 2rem;
+            font-size: 1.05rem;
+            border-radius: 12px;
+        }
+
+        /* Auth Container */
+        .auth-container {
+            min-height: 80vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+        }
+
+        .auth-form {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 2.5rem;
+            border-radius: 24px;
+            box-shadow: 
+                0 20px 50px rgba(0, 0, 0, 0.1),
+                0 2px 10px rgba(0, 0, 0, 0.05);
+            width: 100%;
+            max-width: 520px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .auth-form h2 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-size: 1.8rem;
+            font-weight: 800;
+            display: inline-block;
+            width: 100%;
+            white-space: nowrap;
+        }
+
+        /* Form Styles */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #1e293b;
+            font-size: 0.95rem;
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 1rem;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+            background: white;
+        }
+
+        .form-group small {
+            display: block;
+            margin-top: 0.5rem;
+            color: #64748b;
+            font-size: 0.85rem;
+        }
+
+        /* Messages */
+        .error-message {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            color: #dc2626;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #ef4444;
+            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.1);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        .success-message {
+            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+            color: #16a34a;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #22c55e;
+            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.1);
+            font-size: 0.95rem;
+            font-weight: 500;
+        }
+
+        /* Footer */
+        footer {
+            background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
+            color: white;
+            text-align: center;
+            padding: 2rem;
+            margin-top: 2rem;
+            font-size: 1rem;
+            font-weight: 500;
+            box-shadow: 0 -8px 32px rgba(30, 41, 59, 0.1);
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .auth-form {
+                margin: 1rem;
+                padding: 2rem 1.5rem;
+                max-width: 450px;
+            }
+            
+            .auth-form h2 {
+                font-size: 1.6rem;
+                margin-bottom: 1.2rem;
+            }
+            
+            .form-group {
+                margin-bottom: 1.3rem;
+            }
+        }
+
+        .login-link {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 0.95rem;
+        }
+
+        .login-link a {
+            color: #3b82f6;
+            text-decoration: none;
+            font-weight: 600;
+            transition: color 0.3s ease;
+        }
+
+        .login-link a:hover {
+            color: #1d4ed8;
+        }
+    </style>
 </head>
 <body>
-  <div class="auth-container">
-    <h2>Create Account</h2>
+    <section class="auth-container">
+        <div class="auth-form">
+            <h2>Create an Account</h2>
+            
+            <?php if ($error): ?>
+                <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
+            <?php endif; ?>
+            
+            <?php if ($success): ?>
+                <div class="success-message"><?php echo $success; ?></div>
+            <?php endif; ?>
+            
+            <form method="POST" action="" id="registerForm">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" name="username" 
+                           value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>" 
+                           required>
+                    <small>3-20 characters, letters, numbers, and underscores only</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" id="email" name="email" 
+                           value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
+                           required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="user_type">I am a:</label>
+                    <select id="user_type" name="user_type" required>
+                        <option value="">Select your role</option>
+                        <option value="student" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'student') ? 'selected' : ''; ?>>Student</option>
+                        <option value="teacher" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'teacher') ? 'selected' : ''; ?>>Teacher</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" name="password" required>
+                    <small>Password must be at least 6 characters long</small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm_password">Confirm Password</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required>
+                </div>
+                
+                <button type="submit" class="btn" style="width: 100%;">Register</button>
+            </form>
+            
+            <div class="login-link">
+                Already have an account? <a href="login.php">Login here</a>
+            </div>
+        </div>
+    </section>
 
-    <?php if ($error): ?>
-      <div class="error-message"><?= htmlspecialchars($error) ?></div>
-    <?php endif; ?>
-    <?php if ($success): ?>
-      <div class="success-message"><?= $success ?></div>
-    <?php endif; ?>
+    <footer>
+        <p>&copy; 2024 EduMate. All rights reserved.</p>
+    </footer>
 
-    <form method="POST">
-      <div class="form-group">
-        <label>Username</label>
-        <input type="text" name="username" 
-          value="<?= isset($_POST['username']) ? htmlspecialchars($_POST['username']) : '' ?>" required>
-      </div>
-
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" name="email" 
-          value="<?= isset($_POST['email']) ? htmlspecialchars($_POST['email']) : '' ?>" required>
-      </div>
-
-      <div class="form-group">
-        <label>I am a:</label>
-        <select name="user_type" required>
-          <option value="">Select role</option>
-          <option value="student" <?= (isset($_POST['user_type']) && $_POST['user_type']=='student')?'selected':'' ?>>Student</option>
-          <option value="teacher" <?= (isset($_POST['user_type']) && $_POST['user_type']=='teacher')?'selected':'' ?>>Teacher</option>
-        </select>
-      </div>
-
-      <div class="form-group">
-        <label>Password</label>
-        <input type="password" name="password" id="password" required>
-      </div>
-
-      <div class="form-group">
-        <label>Confirm Password</label>
-        <input type="password" name="confirm_password" id="confirm_password" required>
-      </div>
-
-      <button type="submit" class="btn">Register</button>
-    </form>
-
-    <div class="login-link">
-      Already have an account? <a href="login.php">Login here</a>
-    </div>
-  </div>
-
-  <script>
-    // Live password check
-    document.getElementById('confirm_password').addEventListener('input', function() {
-      this.setCustomValidity(this.value !== document.getElementById('password').value ? "Passwords don't match" : "");
-    });
-  </script>
+    <script>
+        // Client-side password confirmation validation
+        document.getElementById('confirm_password').addEventListener('input', function() {
+            const password = document.getElementById('password').value;
+            const confirmPassword = this.value;
+            
+            if (password !== confirmPassword && confirmPassword.length > 0) {
+                this.setCustomValidity('Passwords do not match');
+                this.style.borderColor = '#c62828';
+            } else {
+                this.setCustomValidity('');
+                this.style.borderColor = '';
+            }
+        });
+        
+        // Username validation
+        document.getElementById('username').addEventListener('input', function() {
+            const username = this.value;
+            const regex = /^[a-zA-Z0-9_]{3,20}$/;
+            
+            if (username.length > 0 && !regex.test(username)) {
+                this.setCustomValidity('Username must be 3-20 characters long and contain only letters, numbers, and underscores');
+                this.style.borderColor = '#c62828';
+            } else {
+                this.setCustomValidity('');
+                this.style.borderColor = '';
+            }
+        });
+        
+        // Add loading state to form
+        document.getElementById('registerForm').addEventListener('submit', function() {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Account...';
+        });
+    </script>
 </body>
 </html>
