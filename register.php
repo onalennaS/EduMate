@@ -6,19 +6,7 @@ session_start();
 $error = '';
 $success = '';
 
-// Database configuration - UPDATE THESE WITH YOUR ACTUAL DATABASE CREDENTIALS
-$host = 'localhost';
-$dbname = 'edumate_db'; // Your database name
-$username = 'root';   // Your database username
-$password = '';       // Your database password
-
-// Create database connection
-try {
-    $pdo = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
-    $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-} catch(PDOException $e) {
-    $error = "Connection failed: " . $e->getMessage();
-}
+include 'includes/auth.php';
 
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
@@ -102,294 +90,117 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - EduMate</title>
     <style>
-        /* Reset and base styles */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+ /* Reset */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #2d3748;
-            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 30%, #f1f5f9 100%);
-            min-height: 100vh;
-        }
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 40%, #f1f5f9 100%);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
 
-        /* Header and Navigation */
-        header {
-            background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
-            color: white;
-            padding: 1rem 0;
-            box-shadow: 0 8px 32px rgba(30, 41, 59, 0.15);
-            position: relative;
-            overflow: hidden;
-        }
+.auth-container {
+  width: 100%;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(15px);
+  padding: 2rem;
+  border-radius: 18px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+}
 
-        header::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="0.5" fill="rgba(255,255,255,0.03)"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>');
-            pointer-events: none;
-        }
+.auth-form h2 {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 1.6rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, #3b82f6, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
 
-        nav {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 2rem;
-            position: relative;
-            z-index: 1;
-        }
+.form-group { margin-bottom: 1.2rem; }
 
-        .logo {
-            font-size: 1.8rem;
-            font-weight: bold;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-            background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+.form-group label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 0.4rem;
+}
 
-        nav ul {
-            display: flex;
-            list-style: none;
-            gap: 2rem;
-        }
+.form-group input,
+.form-group select {
+  width: 100%;
+  padding: 0.9rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  transition: 0.3s ease;
+  background: #fff;
+}
 
-        nav a {
-            color: rgba(255, 255, 255, 0.9);
-            text-decoration: none;
-            transition: all 0.3s ease;
-            position: relative;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
+.form-group input:focus,
+.form-group select:focus {
+  border-color: #3b82f6;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
+}
 
-        nav a:hover {
-            background: rgba(59, 130, 246, 0.1);
-            color: #60a5fa;
-            transform: translateY(-2px);
-        }
+.btn {
+  width: 100%;
+  padding: 0.9rem;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #fff;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
 
-        nav a::after {
-            content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 50%;
-            width: 0;
-            height: 2px;
-            background: linear-gradient(90deg, #3b82f6, #06b6d4);
-            transition: all 0.3s ease;
-            transform: translateX(-50%);
-        }
+.btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(135deg, #2563eb, #1e40af);
+}
 
-        nav a:hover::after {
-            width: 80%;
-        }
+.error-message, .success-message {
+  margin-bottom: 1rem;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  font-size: 0.9rem;
+}
+.error-message {
+  background: #fee2e2;
+  color: #dc2626;
+  border-left: 4px solid #ef4444;
+}
+.success-message {
+  background: #dcfce7;
+  color: #16a34a;
+  border-left: 4px solid #22c55e;
+}
 
-        /* Buttons */
-        .btn {
-            display: inline-block;
-            padding: 0.7rem 1.3rem;
-            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
-            color: white;
-            text-decoration: none;
-            border-radius: 10px;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-            font-weight: 600;
-            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.25);
-            position: relative;
-            overflow: hidden;
-        }
+.login-link {
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.9rem;
+}
+.login-link a {
+  color: #3b82f6;
+  font-weight: 600;
+  text-decoration: none;
+}
+.login-link a:hover { color: #1d4ed8; }
 
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-            transition: left 0.5s;
-        }
-
-        .btn:hover::before {
-            left: 100%;
-        }
-
-        .btn:hover {
-            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-            transform: translateY(-3px);
-            box-shadow: 0 8px 25px rgba(59, 130, 246, 0.35);
-        }
-
-        .btn-large {
-            padding: 1rem 2rem;
-            font-size: 1.05rem;
-            border-radius: 12px;
-        }
-
-        /* Auth Container */
-        .auth-container {
-            min-height: 80vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2rem;
-            background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-        }
-
-        .auth-form {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(20px);
-            padding: 2.5rem;
-            border-radius: 24px;
-            box-shadow: 
-                0 20px 50px rgba(0, 0, 0, 0.1),
-                0 2px 10px rgba(0, 0, 0, 0.05);
-            width: 100%;
-            max-width: 520px;
-            border: 1px solid rgba(255, 255, 255, 0.3);
-        }
-
-        .auth-form h2 {
-            text-align: center;
-            margin-bottom: 1.5rem;
-            background: linear-gradient(135deg, #1e293b 0%, #3b82f6 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            font-size: 1.8rem;
-            font-weight: 800;
-            display: inline-block;
-            width: 100%;
-            white-space: nowrap;
-        }
-
-        /* Form Styles */
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: #1e293b;
-            font-size: 0.95rem;
-        }
-
-        .form-group input,
-        .form-group select {
-            width: 100%;
-            padding: 1rem;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 1rem;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.9);
-        }
-
-        .form-group input:focus,
-        .form-group select:focus {
-            outline: none;
-            border-color: #3b82f6;
-            box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
-            background: white;
-        }
-
-        .form-group small {
-            display: block;
-            margin-top: 0.5rem;
-            color: #64748b;
-            font-size: 0.85rem;
-        }
-
-        /* Messages */
-        .error-message {
-            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-            color: #dc2626;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #ef4444;
-            box-shadow: 0 4px 15px rgba(239, 68, 68, 0.1);
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        .success-message {
-            background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-            color: #16a34a;
-            padding: 1rem 1.5rem;
-            border-radius: 12px;
-            margin-bottom: 1.5rem;
-            border-left: 4px solid #22c55e;
-            box-shadow: 0 4px 15px rgba(34, 197, 94, 0.1);
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        /* Footer */
-        footer {
-            background: linear-gradient(135deg, #1e293b 0%, #334155 50%, #475569 100%);
-            color: white;
-            text-align: center;
-            padding: 2rem;
-            margin-top: 2rem;
-            font-size: 1rem;
-            font-weight: 500;
-            box-shadow: 0 -8px 32px rgba(30, 41, 59, 0.1);
-        }
-
-        /* Responsive Design */
-        @media (max-width: 768px) {
-            .auth-form {
-                margin: 1rem;
-                padding: 2rem 1.5rem;
-                max-width: 450px;
-            }
-            
-            .auth-form h2 {
-                font-size: 1.6rem;
-                margin-bottom: 1.2rem;
-            }
-            
-            .form-group {
-                margin-bottom: 1.3rem;
-            }
-        }
-
-        .login-link {
-            margin-top: 1.5rem;
-            text-align: center;
-            font-size: 0.95rem;
-        }
-
-        .login-link a {
-            color: #3b82f6;
-            text-decoration: none;
-            font-weight: 600;
-            transition: color 0.3s ease;
-        }
-
-        .login-link a:hover {
-            color: #1d4ed8;
-        }
     </style>
 </head>
 <body>
@@ -450,9 +261,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
         </div>
     </section>
 
-    <footer>
-        <p>&copy; 2024 EduMate. All rights reserved.</p>
-    </footer>
 
     <script>
         // Client-side password confirmation validation
