@@ -390,7 +390,7 @@ $current_page = basename($_SERVER['PHP_SELF'], '.php');
                 </li>
                 <li class="nav-item">
                     <a class="nav-link <?php echo ($current_page === 'profile') ? 'active' : ''; ?>" 
-                       href="profile.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Profile">
+                       href="student_profile.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Profile">
                         <i class="fas fa-user"></i>
                         <span>Profile</span>
                     </a>

@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Sep 17, 2025 at 10:49 AM
+-- Generation Time: Sep 19, 2025 at 05:07 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.1.25
 
@@ -89,6 +89,22 @@ CREATE TABLE `courses` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `enrollments`
+--
+
+CREATE TABLE `enrollments` (
+  `id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `enrollment_date` datetime DEFAULT current_timestamp(),
+  `status` enum('active','inactive','completed','dropped') DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `grades`
 --
 
@@ -111,6 +127,21 @@ INSERT INTO `grades` (`id`, `grade_number`, `grade_name`, `description`, `create
 (4, 10, 'Grade 10', 'FET Phase - First year', '2025-09-09 21:45:19'),
 (5, 11, 'Grade 11', 'FET Phase - Second year', '2025-09-09 21:45:19'),
 (6, 12, 'Grade 12', 'FET Phase - Matric year', '2025-09-09 21:45:19');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `open_resources`
+--
+
+CREATE TABLE `open_resources` (
+  `id` int(11) NOT NULL,
+  `subject_id` int(11) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `description` text DEFAULT NULL,
+  `resource_link` varchar(500) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -191,7 +222,27 @@ CREATE TABLE `subject_enrollments` (
 
 INSERT INTO `subject_enrollments` (`id`, `student_id`, `subject_id`, `grade_at_enrollment`, `status`, `enrollment_date`, `dropped_date`, `created_at`, `updated_at`) VALUES
 (35, 2, 4, 10, 'active', '2025-09-17 07:55:37', NULL, '2025-09-17 07:55:37', '2025-09-17 07:55:37'),
-(36, 2, 15, 10, 'active', '2025-09-17 07:55:40', NULL, '2025-09-17 07:55:40', '2025-09-17 07:55:40');
+(36, 2, 15, 10, 'active', '2025-09-17 07:55:40', NULL, '2025-09-17 07:55:40', '2025-09-17 07:55:40'),
+(37, 2, 3, 10, 'active', '2025-09-18 06:26:29', NULL, '2025-09-18 06:26:29', '2025-09-18 06:26:29'),
+(38, 2, 2, 10, 'active', '2025-09-18 06:26:38', NULL, '2025-09-18 06:26:38', '2025-09-18 06:26:38');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `subject_materials`
+--
+
+CREATE TABLE `subject_materials` (
+  `id` int(11) NOT NULL,
+  `subject_id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `title` varchar(200) NOT NULL,
+  `description` text DEFAULT NULL,
+  `file_path` varchar(500) DEFAULT NULL,
+  `external_link` varchar(500) DEFAULT NULL,
+  `accessibility_features` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`accessibility_features`)),
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -225,6 +276,14 @@ CREATE TABLE `teacher_subjects` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `teacher_subjects`
+--
+
+INSERT INTO `teacher_subjects` (`id`, `teacher_id`, `subject_id`, `created_at`) VALUES
+(17, 4, 4, '2025-09-17 14:02:36'),
+(18, 4, 3, '2025-09-18 08:12:57');
+
 -- --------------------------------------------------------
 
 --
@@ -234,11 +293,16 @@ CREATE TABLE `teacher_subjects` (
 CREATE TABLE `users` (
   `id` int(11) NOT NULL,
   `username` varchar(50) NOT NULL,
+  `first_name` varchar(50) DEFAULT NULL,
+  `last_name` varchar(50) DEFAULT NULL,
   `email` varchar(100) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
   `password` varchar(255) NOT NULL,
   `user_type` enum('student','teacher') NOT NULL,
   `grade` int(2) DEFAULT NULL,
   `accessibility_needs` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`accessibility_needs`)),
+  `bio` text DEFAULT NULL,
+  `department` varchar(100) DEFAULT NULL,
   `profile_picture` varchar(255) DEFAULT NULL,
   `full_name` varchar(100) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -249,9 +313,9 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `username`, `email`, `password`, `user_type`, `grade`, `accessibility_needs`, `profile_picture`, `full_name`, `created_at`, `last_login`) VALUES
-(2, 'ona', 'onalennahamese07@gmail.com', '$2y$10$/jvzwzKv7NV6hvQOMR6.KOIW/MWpe9cN/pKwmmhEmtwoqnCu8ed6C', 'student', 10, NULL, NULL, NULL, '2025-09-06 10:49:30', '2025-09-17 08:38:03'),
-(4, 'Teacher', 'onalennahamese@gmail.com', '$2y$10$jOE4kObeYf1zvqlaMiIPt.vE8bN5TYVrHW85uBroiC8OznWdF7Yu6', 'teacher', NULL, NULL, NULL, NULL, '2025-09-09 23:09:43', '2025-09-10 00:41:18');
+INSERT INTO `users` (`id`, `username`, `first_name`, `last_name`, `email`, `phone`, `password`, `user_type`, `grade`, `accessibility_needs`, `bio`, `department`, `profile_picture`, `full_name`, `created_at`, `last_login`) VALUES
+(2, 'ona', 'onalenna student', 'Hamese', 'onalennahamese07@gmail.com', NULL, '$2y$10$W6cu3XqNbxhdI7Pd5DRuLe1hCO2um1Myz9xVq83E3Uh8NtU1St6Nm', 'student', 12, NULL, NULL, NULL, 'uploads/profile_pictures/student_2_1758292138.png', NULL, '2025-09-06 10:49:30', '2025-09-19 15:03:50'),
+(4, 'Teacher', 'Teacher Onalenna', 'Hamese', 'onalennahamese@gmail.com', NULL, '$2y$10$6gNHEqw.kbsq22UC7LlXeuDcaA3SuykOLGSYzbAFARYeE.V48ZnSy', 'teacher', NULL, NULL, 'i am me dah', 'Teacher', 'uploads/profile_pictures/teacher_4_1758292227.png', NULL, '2025-09-09 23:09:43', '2025-09-19 15:04:22');
 
 --
 -- Indexes for dumped tables
@@ -282,10 +346,25 @@ ALTER TABLE `courses`
   ADD KEY `grade_id` (`grade_id`);
 
 --
+-- Indexes for table `enrollments`
+--
+ALTER TABLE `enrollments`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_enrollment` (`course_id`,`student_id`),
+  ADD KEY `student_id` (`student_id`);
+
+--
 -- Indexes for table `grades`
 --
 ALTER TABLE `grades`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `open_resources`
+--
+ALTER TABLE `open_resources`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `open_resources_fk_subject` (`subject_id`);
 
 --
 -- Indexes for table `subjects`
@@ -302,6 +381,14 @@ ALTER TABLE `subject_enrollments`
   ADD UNIQUE KEY `unique_student_subject` (`student_id`,`subject_id`),
   ADD KEY `student_id` (`student_id`),
   ADD KEY `subject_id` (`subject_id`);
+
+--
+-- Indexes for table `subject_materials`
+--
+ALTER TABLE `subject_materials`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `subject_materials_fk_subject` (`subject_id`),
+  ADD KEY `subject_materials_fk_teacher` (`teacher_id`);
 
 --
 -- Indexes for table `submissions`
@@ -353,10 +440,22 @@ ALTER TABLE `courses`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `enrollments`
+--
+ALTER TABLE `enrollments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `grades`
 --
 ALTER TABLE `grades`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `open_resources`
+--
+ALTER TABLE `open_resources`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `subjects`
@@ -368,7 +467,13 @@ ALTER TABLE `subjects`
 -- AUTO_INCREMENT for table `subject_enrollments`
 --
 ALTER TABLE `subject_enrollments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=39;
+
+--
+-- AUTO_INCREMENT for table `subject_materials`
+--
+ALTER TABLE `subject_materials`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `submissions`
@@ -380,7 +485,7 @@ ALTER TABLE `submissions`
 -- AUTO_INCREMENT for table `teacher_subjects`
 --
 ALTER TABLE `teacher_subjects`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
 
 --
 -- AUTO_INCREMENT for table `users`
@@ -413,11 +518,31 @@ ALTER TABLE `courses`
   ADD CONSTRAINT `courses_ibfk_3` FOREIGN KEY (`grade_id`) REFERENCES `grades` (`id`) ON DELETE CASCADE;
 
 --
+-- Constraints for table `enrollments`
+--
+ALTER TABLE `enrollments`
+  ADD CONSTRAINT `enrollments_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `enrollments_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `open_resources`
+--
+ALTER TABLE `open_resources`
+  ADD CONSTRAINT `open_resources_fk_subject` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE;
+
+--
 -- Constraints for table `subject_enrollments`
 --
 ALTER TABLE `subject_enrollments`
   ADD CONSTRAINT `subject_enrollments_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `subject_enrollments_ibfk_2` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `subject_materials`
+--
+ALTER TABLE `subject_materials`
+  ADD CONSTRAINT `subject_materials_fk_subject` FOREIGN KEY (`subject_id`) REFERENCES `subjects` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `subject_materials_fk_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `submissions`
