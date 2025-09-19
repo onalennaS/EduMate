@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chemical & Physics Simulator</title>
+    <link href="css-calc.css" rel="stylesheet">
+</head>
+
+<body>
+
+    <div class="container">
+
+        <!-- Calculators & Visualizations Section -->
+        <div class="panel calculators-visualizations">
+            <h2 class="panel-title">Calculators & Visualizations</h2>
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="vpm">VPM Visualizer</button>
+                <button class="tab-btn" data-tab="newtons-laws">Newton's Laws</button>
+                <button class="tab-btn" data-tab="momentum">Momentum</button>
+            </div>
+
+            <div id="vpm-content" class="tab-content active">
+                <div class="input-group">
+                    <label for="eventsPerMinute">Events per minute (VPM)</label>
+                    <input type="number" id="eventsPerMinute" value="80">
+                </div>
+                <p class="description">VPM = how many pulses happen each minute (like 60 beats per minute). We show a
+                    pulsing animation and convert to Hz.</p>
+                <div class="input-group">
+                    <label for="hz">Hz</label>
+                    <input type="text" id="hz" value="1.00" readonly>
+                </div>
+                <div class="input-group">
+                    <label for="period">Period</label>
+                    <input type="text" id="period" value="1.00 s" readonly>
+                </div>
+                <div class="vpm-canvas-container">
+                    <canvas id="vpmCanvas"></canvas>
+                </div>
+            </div>
+
+            <div id="newtons-laws-content" class="tab-content">
+                <p class="description">Newton's Laws ($$F = ma$$)</p>
+                <div class="input-group">
+                    <label for="mass">Mass (kg)</label>
+                    <input type="number" id="mass" value="5">
+                </div>
+                <div class="input-group">
+                    <label for="force">Force (N)</label>
+                    <input type="number" id="force" value="5">
+                </div>
+                <div class="calculation-result">
+                    <p id="accelerationResult">a = 1.00 m/s²</p>
+                    <p class="formula">$$F = ma$$</p>
+                </div>
+                <div class="newton-canvas-container">
+                    <canvas id="newtonCanvas"></canvas>
+                </div>
+            </div>
+
+            <div id="momentum-content" class="tab-content">
+                <p class="description">Momentum ($$p = mv$$)</p>
+                <div class="input-group">
+                    <label for="momentumMass">Mass (kg)</label>
+                    <input type="number" id="momentumMass" value="10">
+                </div>
+                <div class="input-group">
+                    <label for="velocity">Velocity (m/s)</label>
+                    <input type="number" id="velocity" value="2">
+                </div>
+                <div class="calculation-result">
+                    <p id="momentumResult">$$p$$ = 20.00 kg⋅m/s</p>
+                    <p class="formula">$$p = mv$$</p>
+                </div>
+                <div class="momentum-canvas-container">
+                    <canvas id="momentumCanvas"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="calc-visuals.js"></script>
+</body>
+
+</html>

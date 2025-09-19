@@ -1,302 +1,232 @@
 <?php
-// Start session
+// student_dashboard/subjects.php
 session_start();
+require_once '../config/database.php';
 
-// Initialize variables
-$error = '';
-$success = '';
+if (!isset($_SESSION['user_id']) || ($_SESSION['user_type'] ?? '') !== 'student') {
+    header("Location: ../login.php");
+    exit;
+}
 
-include 'includes/auth.php';
+$student_id = $_SESSION['user_id'];
 
-// Process form submission
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
-    // Get form data
-    $username = trim($_POST['username']);
-    $email = trim($_POST['email']);
-    $user_type = $_POST['user_type'];
-    $password = $_POST['password'];
-    $confirm_password = $_POST['confirm_password'];
-    
-    // Validation
-    if (empty($username) || empty($email) || empty($user_type) || empty($password) || empty($confirm_password)) {
-        $error = "All fields are required.";
-    }
-    
-    // Username validation
-    elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
-        $error = "Username must be 3-20 characters long and contain only letters, numbers, and underscores.";
-    }
-    
-    // Email validation
-    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "Please enter a valid email address.";
-    }
-    
-    // Password validation
-    elseif (strlen($password) < 6) {
-        $error = "Password must be at least 6 characters long.";
-    }
-    
-    // Password confirmation
-    elseif ($password !== $confirm_password) {
-        $error = "Passwords do not match.";
-    }
-    
-    // User type validation
-    elseif (!in_array($user_type, ['student', 'teacher'])) {
-        $error = "Please select a valid user type.";
-    }
-    
-    else {
-        try {
-            // Check if username already exists
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
-            $stmt->execute([$username]);
-            if ($stmt->rowCount() > 0) {
-                $error = "Username already exists. Please choose a different username.";
-            }
-            
-            // Check if email already exists
-            else {
-                $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-                $stmt->execute([$email]);
-                if ($stmt->rowCount() > 0) {
-                    $error = "Email already exists. Please use a different email address.";
-                }
-                
-                // If no errors, create the user
-                else {
-                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                    
-                    $stmt = $pdo->prepare("INSERT INTO users (username, email, user_type, password, created_at) VALUES (?, ?, ?, ?, NOW())");
-                    $stmt->execute([$username, $email, $user_type, $hashed_password]);
-                    
-                    $success = "Account created successfully! You can now <a href='login.php'>login</a>.";
-                    
-                    // Clear form data on success
-                    $_POST = array();
-                }
-            }
-        } catch(PDOException $e) {
-            $error = "Registration failed: " . $e->getMessage();
+// Get student data
+$stmt = $pdo->prepare("SELECT * FROM users WHERE id = ?");
+$stmt->execute([$student_id]);
+$student_data = $stmt->fetch(PDO::FETCH_ASSOC);
+$student_grade = $student_data ? $student_data['grade'] : null;
+
+$success_message = null;
+$error_message = null;
+
+// --- Handle Grade Update ---
+if (($_POST['action'] ?? '') === 'set_grade') {
+    $selected_grade = $_POST['selected_grade'] ?? null;
+    if ($selected_grade && is_numeric($selected_grade)) {
+        $stmt = $pdo->prepare("UPDATE users SET grade = ? WHERE id = ?");
+        if ($stmt->execute([$selected_grade, $student_id])) {
+            $student_grade = $selected_grade;
+            $success_message = "Grade successfully updated!";
         }
     }
 }
+
+// --- Handle Enrollment ---
+if (($_POST['action'] ?? '') === 'enroll_subject') {
+    $subject_id = $_POST['subject_id'] ?? null;
+    if ($subject_id && $student_grade) {
+        $stmt = $pdo->prepare("SELECT * FROM subjects WHERE id = ? AND JSON_CONTAINS(applicable_grades, ?)");
+        $stmt->execute([$subject_id, json_encode((int) $student_grade)]);
+        $subject = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if ($subject) {
+            $stmt = $pdo->prepare("SELECT id FROM subject_enrollments WHERE student_id = ? AND subject_id = ? AND status='active'");
+            $stmt->execute([$student_id, $subject_id]);
+            if ($stmt->fetch()) {
+                $error_message = "Already enrolled.";
+            } else {
+                $stmt = $pdo->prepare("INSERT INTO subject_enrollments (student_id, subject_id, grade_at_enrollment, status, enrollment_date) VALUES (?, ?, ?, 'active', NOW())");
+                if ($stmt->execute([$student_id, $subject_id, $student_grade])) {
+                    $success_message = "Enrolled in " . htmlspecialchars($subject['subject_name']);
+                }
+            }
+        }
+    }
+}
+
+// --- Handle Unenrollment ---
+if (($_POST['action'] ?? '') === 'unenroll_subject') {
+    $subject_id = $_POST['subject_id'] ?? null;
+    if ($subject_id) {
+        $stmt = $pdo->prepare("UPDATE subject_enrollments SET status='dropped', dropped_date=NOW() WHERE student_id=? AND subject_id=? AND status='active'");
+        $stmt->execute([$student_id, $subject_id]);
+        $success_message = "Unenrolled successfully.";
+    }
+}
+
+// --- Fetch Enrolled Subjects ---
+$enrolled_subjects = [];
+if ($student_grade) {
+    $stmt = $pdo->prepare("
+        SELECT s.*, se.enrollment_date, se.grade_at_enrollment
+        FROM subjects s
+        JOIN subject_enrollments se ON s.id = se.subject_id
+        WHERE se.student_id = ? AND se.status='active'
+    ");
+    $stmt->execute([$student_id]);
+    $enrolled_subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// --- Fetch Available Subjects ---
+$available_subjects = [];
+if ($student_grade) {
+    $stmt = $pdo->prepare("SELECT * FROM subjects WHERE JSON_CONTAINS(applicable_grades, ?) AND is_active=1");
+    $stmt->execute([json_encode((int) $student_grade)]);
+    $available_subjects = $stmt->fetchAll(PDO::FETCH_ASSOC);
+}
+
+// --- Fetch Detail View ---
+$selected_subject = null;
+$materials = [];
+$open_resources = [];
+if (!empty($_GET['view_id'])) {
+    $view_id = (int) $_GET['view_id'];
+
+    $stmt = $pdo->prepare("
+        SELECT s.*, se.enrollment_date, se.grade_at_enrollment
+        FROM subjects s
+        JOIN subject_enrollments se ON s.id = se.subject_id
+        WHERE se.student_id = ? AND s.id = ? AND se.status='active'
+    ");
+    $stmt->execute([$student_id, $view_id]);
+    $selected_subject = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($selected_subject) {
+        $stmt = $pdo->prepare("SELECT sm.*, u.full_name as teacher_name FROM subject_materials sm JOIN users u ON sm.teacher_id=u.id WHERE sm.subject_id=? ORDER BY sm.created_at DESC");
+        $stmt->execute([$view_id]);
+        $materials = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        $stmt = $pdo->prepare("SELECT * FROM open_resources WHERE subject_id=? ORDER BY created_at DESC");
+        $stmt->execute([$view_id]);
+        $open_resources = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+}
+
+include '../includes/student_header.php';
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register - EduMate</title>
-    <style>
- /* Reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
 
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #1e293b 0%, #334155 40%, #f1f5f9 100%);
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
+<div class="container py-4">
+    <?php if ($success_message): ?>
+        <div class="alert alert-success"><?= $success_message ?></div>
+    <?php endif; ?>
+    <?php if ($error_message): ?>
+        <div class="alert alert-danger"><?= $error_message ?></div>
+    <?php endif; ?>
 
-.auth-container {
-  width: 100%;
-  max-width: 420px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(15px);
-  padding: 2rem;
-  border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
-}
-
-.auth-form h2 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  font-size: 1.6rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #3b82f6, #06b6d4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.form-group { margin-bottom: 1.2rem; }
-
-.form-group label {
-  display: block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 0.4rem;
-}
-
-.form-group input,
-.form-group select {
-  width: 100%;
-  padding: 0.9rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  transition: 0.3s ease;
-  background: #fff;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  border-color: #3b82f6;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
-}
-
-.btn {
-  width: 100%;
-  padding: 0.9rem;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  border: none;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #fff;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.btn:hover {
-  transform: translateY(-2px);
-  background: linear-gradient(135deg, #2563eb, #1e40af);
-}
-
-.error-message, .success-message {
-  margin-bottom: 1rem;
-  padding: 0.9rem 1rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
-}
-.error-message {
-  background: #fee2e2;
-  color: #dc2626;
-  border-left: 4px solid #ef4444;
-}
-.success-message {
-  background: #dcfce7;
-  color: #16a34a;
-  border-left: 4px solid #22c55e;
-}
-
-.login-link {
-  margin-top: 1rem;
-  text-align: center;
-  font-size: 0.9rem;
-}
-.login-link a {
-  color: #3b82f6;
-  font-weight: 600;
-  text-decoration: none;
-}
-.login-link a:hover { color: #1d4ed8; }
-
-    </style>
-</head>
-<body>
-    <section class="auth-container">
-        <div class="auth-form">
-            <h2>Create an Account</h2>
-            
-            <?php if ($error): ?>
-                <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
-            <?php endif; ?>
-            
-            <?php if ($success): ?>
-                <div class="success-message"><?php echo $success; ?></div>
-            <?php endif; ?>
-            
-            <form method="POST" action="" id="registerForm">
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" 
-                           value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>" 
-                           required>
-                    <small>3-20 characters, letters, numbers, and underscores only</small>
+    <?php if ($selected_subject): ?>
+        <!-- Subject Detail Card -->
+        <div class="subject-card mb-4">
+            <div class="subject-header <?= $selected_subject['category']; ?>">
+                <div class="d-flex justify-content-between">
+                    <h3 class="mb-0"><?= htmlspecialchars($selected_subject['subject_name']); ?></h3>
+                    <span class="badge bg-light text-dark">Grade <?= $selected_subject['grade_at_enrollment']; ?></span>
                 </div>
-                
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" 
-                           value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
-                           required>
+                <div class="stats-badge mt-2"><?= htmlspecialchars($selected_subject['subject_code']); ?></div>
+            </div>
+            <div class="card-body">
+                <p class="mb-3"><?= htmlspecialchars($selected_subject['description']); ?></p>
+                <div class="mb-3">
+                    <i class="fas fa-calendar me-2"></i>Enrolled:
+                    <?= date("M d, Y", strtotime($selected_subject['enrollment_date'])); ?>
                 </div>
-                
-                <div class="form-group">
-                    <label for="user_type">I am a:</label>
-                    <select id="user_type" name="user_type" required>
-                        <option value="">Select your role</option>
-                        <option value="student" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'student') ? 'selected' : ''; ?>>Student</option>
-                        <option value="teacher" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'teacher') ? 'selected' : ''; ?>>Teacher</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                    <small>Password must be at least 6 characters long</small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirm_password">Confirm Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" required>
-                </div>
-                
-                <button type="submit" class="btn" style="width: 100%;">Register</button>
-            </form>
-            
-            <div class="login-link">
-                Already have an account? <a href="login.php">Login here</a>
             </div>
         </div>
-    </section>
+
+        <!-- Teacher Materials -->
+        <div class="content-card p-4 mb-4">
+            <h4 class="mb-3"><i class="fas fa-book-open text-primary me-2"></i>Teacher Materials</h4>
+            <?php if (empty($materials)): ?>
+                <p>No materials uploaded yet.</p>
+            <?php else: ?>
+                <div class="row">
+                    <?php foreach ($materials as $m): ?>
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5><?= htmlspecialchars($m['title']); ?></h5>
+                                    <p class="text-muted"><?= htmlspecialchars($m['description']); ?></p>
+                                    <small>By <?= htmlspecialchars($m['teacher_name']); ?> on
+                                        <?= date("M d, Y", strtotime($m['created_at'])); ?></small>
+                                    <div class="mt-2">
+                                        <?php if ($m['file_path']): ?>
+                                            <a href="../<?= $m['file_path']; ?>" target="_blank"
+                                                class="btn btn-sm btn-outline-primary">📂 Download</a>
+                                        <?php endif; ?>
+                                        <?php if ($m['external_link']): ?>
+                                            <a href="<?= $m['external_link']; ?>" target="_blank"
+                                                class="btn btn-sm btn-outline-secondary">🔗 Open Link</a>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Additional Resources -->
+        <div class="content-card p-4 mb-4">
+            <h4 class="mb-3"><i class="fas fa-globe text-success me-2"></i>Additional Resources</h4>
+            <?php if (empty($open_resources)): ?>
+                <p>No additional resources.</p>
+            <?php else: ?>
+                <?php foreach ($open_resources as $r): ?>
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5><?= htmlspecialchars($r['title']); ?></h5>
+                            <p class="text-muted"><?= htmlspecialchars($r['description']); ?></p>
+
+                            <?php if (!empty($r['resource_link'])): ?>
+                                <a href="<?= htmlspecialchars($r['resource_link']); ?>" target="_blank"
+                                    class="btn btn-sm btn-outline-success">
+                                    <?= htmlspecialchars($r['button_label'] ?? 'Open Resource'); ?>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
+        </div>
 
 
-    <script>
-        // Client-side password confirmation validation
-        document.getElementById('confirm_password').addEventListener('input', function() {
-            const password = document.getElementById('password').value;
-            const confirmPassword = this.value;
-            
-            if (password !== confirmPassword && confirmPassword.length > 0) {
-                this.setCustomValidity('Passwords do not match');
-                this.style.borderColor = '#c62828';
-            } else {
-                this.setCustomValidity('');
-                this.style.borderColor = '';
-            }
-        });
-        
-        // Username validation
-        document.getElementById('username').addEventListener('input', function() {
-            const username = this.value;
-            const regex = /^[a-zA-Z0-9_]{3,20}$/;
-            
-            if (username.length > 0 && !regex.test(username)) {
-                this.setCustomValidity('Username must be 3-20 characters long and contain only letters, numbers, and underscores');
-                this.style.borderColor = '#c62828';
-            } else {
-                this.setCustomValidity('');
-                this.style.borderColor = '';
-            }
-        });
-        
-        // Add loading state to form
-        document.getElementById('registerForm').addEventListener('submit', function() {
-            const submitBtn = this.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Creating Account...';
-        });
-    </script>
-</body>
-</html>
+
+        <a href="subjects.php" class="btn btn-secondary"><i class="fas fa-arrow-left me-2"></i>Back to My Subjects</a>
+
+    <?php else: ?>
+        <!-- Normal Subjects List -->
+        <div class="content-card p-4">
+            <h3 class="mb-4"><i class="fas fa-book text-primary me-2"></i>My Enrolled Subjects
+                (<?= count($enrolled_subjects) ?>)</h3>
+            <div class="row">
+                <?php foreach ($enrolled_subjects as $subject): ?>
+                    <div class="col-md-4 mb-4">
+                        <div class="subject-card">
+                            <div class="subject-header <?= $subject['category']; ?>">
+                                <h5><?= htmlspecialchars($subject['subject_name']); ?></h5>
+                                <div class="stats-badge"><?= htmlspecialchars($subject['subject_code']); ?></div>
+                            </div>
+                            <div class="card-body">
+                                <p><?= htmlspecialchars($subject['description'] ?? 'No description available.'); ?></p>
+                                <a href="?view_id=<?= $subject['id']; ?>" class="btn btn-outline-primary btn-sm">View
+                                    Details</a>
+                            </div>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+            </div>
+        </div>
+    <?php endif; ?>
+</div>
+
+<?php include '../includes/student_footer.php'; ?>

@@ -23,6 +23,8 @@ require_once 'includes/auth.php';
                 <?php if (isLoggedIn()): ?>
                     <?php if ($_SESSION['user_type'] === 'student'): ?>
                         <li><a href="student_dashboard/student_dashboard.php">Dashboard</a></li>
+                    <?php elseif ($_SESSION['user_type'] === 'admin'): ?>
+                        <li><a href="admin/admin_dashboard.php">Dashboard</a></li>
                     <?php else: ?>
                         <li><a href="teacher_dashboard/teacher_dashboard.php">Dashboard</a></li>
                     <?php endif; ?>
