@@ -1,84 +1,43 @@
 <?php
-// Start session
 session_start();
+require_once 'config/database.php';
 
-// Initialize variables
-$error = '';
-$success = '';
+$errors = [];
+$success_message = '';
 
-include 'includes/auth.php';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $username = trim($_POST['username'] ?? '');
+    $email = trim($_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    $user_type = $_POST['user_type'] ?? 'student';
 
-// Process form submission
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
-    // Get form data
-    $username = trim($_POST['username']);
-    $email = trim($_POST['email']);
-    $user_type = $_POST['user_type'];
-    $password = $_POST['password'];
-    $confirm_password = $_POST['confirm_password'];
-    
-    // Validation
-    if (empty($username) || empty($email) || empty($user_type) || empty($password) || empty($confirm_password)) {
-        $error = "All fields are required.";
+    // Validate
+    if (empty($username) || empty($email) || empty($password) || empty($confirm_password)) {
+        $errors[] = "All fields are required.";
+    } elseif ($password !== $confirm_password) {
+        $errors[] = "Passwords do not match.";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = "Invalid email address.";
+    } elseif (!in_array($user_type, ['student','teacher','admin'])) {
+        $errors[] = "Invalid user type.";
     }
-    
-    // Username validation
-    elseif (!preg_match('/^[a-zA-Z0-9_]{3,20}$/', $username)) {
-        $error = "Username must be 3-20 characters long and contain only letters, numbers, and underscores.";
-    }
-    
-    // Email validation
-    elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        $error = "Please enter a valid email address.";
-    }
-    
-    // Password validation
-    elseif (strlen($password) < 6) {
-        $error = "Password must be at least 6 characters long.";
-    }
-    
-    // Password confirmation
-    elseif ($password !== $confirm_password) {
-        $error = "Passwords do not match.";
-    }
-    
-    // User type validation
-    elseif (!in_array($user_type, ['student', 'teacher'])) {
-        $error = "Please select a valid user type.";
-    }
-    
-    else {
-        try {
-            // Check if username already exists
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
-            $stmt->execute([$username]);
-            if ($stmt->rowCount() > 0) {
-                $error = "Username already exists. Please choose a different username.";
+
+    if (empty($errors)) {
+        // Check for existing username/email
+        $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ? OR email = ?");
+        $stmt->execute([$username, $email]);
+        if ($stmt->fetch()) {
+            $errors[] = "Username or email already taken.";
+        } else {
+            $hashedPassword = password_hash($password, PASSWORD_BCRYPT);
+
+            $stmt = $pdo->prepare("INSERT INTO users (username, email, password, user_type, created_at) VALUES (?, ?, ?, ?, NOW())");
+            if ($stmt->execute([$username, $email, $hashedPassword, $user_type])) {
+                $success_message = "Registration successful! You can now <a href='login.php'>login</a>.";
+            } else {
+                $errors[] = "Failed to register. Please try again.";
             }
-            
-            // Check if email already exists
-            else {
-                $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-                $stmt->execute([$email]);
-                if ($stmt->rowCount() > 0) {
-                    $error = "Email already exists. Please use a different email address.";
-                }
-                
-                // If no errors, create the user
-                else {
-                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                    
-                    $stmt = $pdo->prepare("INSERT INTO users (username, email, user_type, password, created_at) VALUES (?, ?, ?, ?, NOW())");
-                    $stmt->execute([$username, $email, $user_type, $hashed_password]);
-                    
-                    $success = "Account created successfully! You can now <a href='login.php'>login</a>.";
-                    
-                    // Clear form data on success
-                    $_POST = array();
-                }
-            }
-        } catch(PDOException $e) {
-            $error = "Registration failed: " . $e->getMessage();
         }
     }
 }
@@ -87,216 +46,62 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Register - EduMate</title>
     <style>
- /* Reset */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background: linear-gradient(135deg, #1e293b 0%, #334155 40%, #f1f5f9 100%);
-  min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.auth-container {
-  width: 100%;
-  max-width: 420px;
-  background: rgba(255, 255, 255, 0.92);
-  backdrop-filter: blur(15px);
-  padding: 2rem;
-  border-radius: 18px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
-}
-
-.auth-form h2 {
-  text-align: center;
-  margin-bottom: 1.5rem;
-  font-size: 1.6rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, #3b82f6, #06b6d4);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-.form-group { margin-bottom: 1.2rem; }
-
-.form-group label {
-  display: block;
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin-bottom: 0.4rem;
-}
-
-.form-group input,
-.form-group select {
-  width: 100%;
-  padding: 0.9rem;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 0.9rem;
-  transition: 0.3s ease;
-  background: #fff;
-}
-
-.form-group input:focus,
-.form-group select:focus {
-  border-color: #3b82f6;
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(59,130,246,0.2);
-}
-
-.btn {
-  width: 100%;
-  padding: 0.9rem;
-  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-  border: none;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 600;
-  color: #fff;
-  cursor: pointer;
-  transition: 0.2s ease;
-}
-
-.btn:hover {
-  transform: translateY(-2px);
-  background: linear-gradient(135deg, #2563eb, #1e40af);
-}
-
-.error-message, .success-message {
-  margin-bottom: 1rem;
-  padding: 0.9rem 1rem;
-  border-radius: 10px;
-  font-size: 0.9rem;
-}
-.error-message {
-  background: #fee2e2;
-  color: #dc2626;
-  border-left: 4px solid #ef4444;
-}
-.success-message {
-  background: #dcfce7;
-  color: #16a34a;
-  border-left: 4px solid #22c55e;
-}
-
-.login-link {
-  margin-top: 1rem;
-  text-align: center;
-  font-size: 0.9rem;
-}
-.login-link a {
-  color: #3b82f6;
-  font-weight: 600;
-  text-decoration: none;
-}
-.login-link a:hover { color: #1d4ed8; }
-
+        body { margin:0; font-family: Arial, sans-serif; background:#f1f5f9; display:flex; align-items:center; justify-content:center; height:100vh; }
+        .card { background:#fff; width:400px; padding:2rem; border-radius:10px; box-shadow:0 4px 15px rgba(0,0,0,0.08); }
+        h2 { color:#1d4ed8; text-align:center; margin:0 0 1rem; }
+        .alert { padding:.75rem; border-radius:6px; margin-bottom:1rem; font-size:.95rem; }
+        .alert-danger { background:#fee2e2; color:#991b1b; }
+        .alert-success { background:#dcfce7; color:#065f46; }
+        label { display:block; font-size:.9rem; margin-bottom:.25rem; color:#374151; }
+        input, select { width:100%; padding:.6rem; border:1px solid #cbd5e1; border-radius:6px; font-size:.95rem; margin-bottom:.8rem; }
+        input:focus, select:focus { outline:none; border-color:#2563eb; box-shadow:0 0 6px rgba(37,99,235,0.2); }
+        button { width:100%; padding:.7rem; background:#2563eb; color:#fff; border:none; border-radius:6px; font-weight:700; cursor:pointer; }
+        .footer { text-align:center; margin-top:.8rem; font-size:.9rem; color:#374151; }
+        .footer a { color:#2563eb; text-decoration:none; font-weight:600; }
     </style>
 </head>
 <body>
-    <section class="auth-container">
-        <div class="auth-form">
-            <h2>Create an Account</h2>
-            
-            <?php if ($error): ?>
-                <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
-            <?php endif; ?>
-            
-            <?php if ($success): ?>
-                <div class="success-message"><?php echo $success; ?></div>
-            <?php endif; ?>
-            
-            <form method="POST" action="" id="registerForm">
-                <div class="form-group">
-                    <label for="username">Username</label>
-                    <input type="text" id="username" name="username" 
-                           value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>" 
-                           required>
-                    <small>3-20 characters, letters, numbers, and underscores only</small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="email">Email</label>
-                    <input type="email" id="email" name="email" 
-                           value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
-                           required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="user_type">I am a:</label>
-                    <select id="user_type" name="user_type" required>
-                        <option value="">Select your role</option>
-                        <option value="student" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'student') ? 'selected' : ''; ?>>Student</option>
-                        <option value="teacher" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'teacher') ? 'selected' : ''; ?>>Teacher</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label for="password">Password</label>
-                    <input type="password" id="password" name="password" required>
-                    <small>Password must be at least 6 characters long</small>
-                </div>
-                
-                <div class="form-group">
-                    <label for="confirm_password">Confirm Password</label>
-                    <input type="password" id="confirm_password" name="confirm_password" required>
-                </div>
-                
-                <button type="submit" class="btn" style="width: 100%;">Register</button>
-            </form>
-            
-            <div class="login-link">
-                Already have an account? <a href="login.php">Login here</a>
+    <div class="card">
+        <h2>Register</h2>
+
+        <?php if ($errors): ?>
+            <div class="alert alert-danger">
+                <?php foreach ($errors as $err): ?><div><?= htmlspecialchars($err) ?></div><?php endforeach; ?>
             </div>
+        <?php endif; ?>
+
+        <?php if ($success_message): ?>
+            <div class="alert alert-success"><?= $success_message ?></div>
+        <?php endif; ?>
+
+        <form method="POST" novalidate>
+            <label>Username</label>
+            <input type="text" name="username" required value="<?= htmlspecialchars($_POST['username'] ?? '') ?>">
+
+            <label>Email</label>
+            <input type="email" name="email" required value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
+
+            <label>Password</label>
+            <input type="password" name="password" required>
+
+            <label>Confirm Password</label>
+            <input type="password" name="confirm_password" required>
+
+            <label>Register As</label>
+            <select name="user_type" required>
+                <option value="student" <?= ($_POST['user_type'] ?? '') === 'student' ? 'selected' : '' ?>>Student</option>
+                <option value="teacher" <?= ($_POST['user_type'] ?? '') === 'teacher' ? 'selected' : '' ?>>Teacher</option>
+                <option value="admin" <?= ($_POST['user_type'] ?? '') === 'admin' ? 'selected' : '' ?>>Admin</option>
+            </select>
+
+            <button type="submit">Register</button>
+        </form>
+
+        <div class="footer">
+            Already have an account? <a href="login.php">Login here</a>
         </div>
-    </section>
-
-
-    <script>
-        // Client-side password confirmation validation
-        document.getElementById('confirm_password').addEventListener('input', function() {
-            const password = document.getElementById('password').value;
-            const confirmPassword = this.value;
-            
-            if (password !== confirmPassword && confirmPassword.length > 0) {
-                this.setCustomValidity('Passwords do not match');
-                this.style.borderColor = '#c62828';
-            } else {
-                this.setCustomValidity('');
-                this.style.borderColor = '';
-            }
-        });
-        
-        // Username validation
-        document.getElementById('username').addEventListener('input', function() {
-            const username = this.value;
-            const regex = /^[a-zA-Z0-9_]{3,20}$/;
-            
-            if (username.length > 0 && !regex.test(username)) {
-                this.setCustomValidity('Username must be 3-20 characters long and contain only letters, numbers, and underscores');
-                this.style.borderColor = '#c62828';
-            } else {
-                this.setCustomValidity('');
-                this.style.borderColor = '';
-            }
-        });
-        
-        // Add loading state to form
-        document.getElementById('registerForm').addEventListener('submit', function() {
-            const submitBtn = this.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Creating Account...';
-        });
-    </script>
+    </div>
 </body>
 </html>
