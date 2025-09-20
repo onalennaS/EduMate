@@ -1,24 +1,26 @@
 <?php
-// Start session
-session_start();
+require_once 'includes/auth.php';
 
-// Initialize variables
+// Redirect if already logged in
+if (isLoggedIn()) {
+    header("Location: index.php");
+    exit();
+}
+
 $error = '';
 $success = '';
-
-include 'includes/auth.php';
 
 // Process form submission
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
     // Get form data
     $username = trim($_POST['username']);
     $email = trim($_POST['email']);
-    $user_type = $_POST['user_type'];
+    $user_type = 'student'; // Only students can register themselves
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     
     // Validation
-    if (empty($username) || empty($email) || empty($user_type) || empty($password) || empty($confirm_password)) {
+    if (empty($username) || empty($email) || empty($password) || empty($confirm_password)) {
         $error = "All fields are required.";
     }
     
@@ -42,43 +44,14 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && !$error) {
         $error = "Passwords do not match.";
     }
     
-    // User type validation
-    elseif (!in_array($user_type, ['student', 'teacher'])) {
-        $error = "Please select a valid user type.";
-    }
-    
     else {
-        try {
-            // Check if username already exists
-            $stmt = $pdo->prepare("SELECT id FROM users WHERE username = ?");
-            $stmt->execute([$username]);
-            if ($stmt->rowCount() > 0) {
-                $error = "Username already exists. Please choose a different username.";
-            }
-            
-            // Check if email already exists
-            else {
-                $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
-                $stmt->execute([$email]);
-                if ($stmt->rowCount() > 0) {
-                    $error = "Email already exists. Please use a different email address.";
-                }
-                
-                // If no errors, create the user
-                else {
-                    $hashed_password = password_hash($password, PASSWORD_DEFAULT);
-                    
-                    $stmt = $pdo->prepare("INSERT INTO users (username, email, user_type, password, created_at) VALUES (?, ?, ?, ?, NOW())");
-                    $stmt->execute([$username, $email, $user_type, $hashed_password]);
-                    
-                    $success = "Account created successfully! You can now <a href='login.php'>login</a>.";
-                    
-                    // Clear form data on success
-                    $_POST = array();
-                }
-            }
-        } catch(PDOException $e) {
-            $error = "Registration failed: " . $e->getMessage();
+        $result = registerUser($username, $email, $password, $user_type);
+        if ($result === true) {
+            $success = "Account created successfully! You can now <a href='login.php'>login</a>.";
+            // Clear form data on success
+            $_POST = array();
+        } else {
+            $error = $result;
         }
     }
 }
@@ -201,12 +174,26 @@ body {
 }
 .login-link a:hover { color: #1d4ed8; }
 
+.info-box {
+  background: #e0f2fe;
+  border-left: 4px solid #0ea5e9;
+  color: #0369a1;
+  padding: 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
     </style>
 </head>
 <body>
     <section class="auth-container">
         <div class="auth-form">
-            <h2>Create an Account</h2>
+            <h2>Student Registration</h2>
+            
+            <div class="info-box">
+                <strong>Note:</strong> Only students can register themselves. Teachers are added by the IT Administrator.
+            </div>
             
             <?php if ($error): ?>
                 <div class="error-message"><?php echo htmlspecialchars($error); ?></div>
@@ -230,15 +217,6 @@ body {
                     <input type="email" id="email" name="email" 
                            value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>" 
                            required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="user_type">I am a:</label>
-                    <select id="user_type" name="user_type" required>
-                        <option value="">Select your role</option>
-                        <option value="student" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'student') ? 'selected' : ''; ?>>Student</option>
-                        <option value="teacher" <?php echo (isset($_POST['user_type']) && $_POST['user_type'] === 'teacher') ? 'selected' : ''; ?>>Teacher</option>
-                    </select>
                 </div>
                 
                 <div class="form-group">

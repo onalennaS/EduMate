@@ -3,10 +3,19 @@ require_once 'includes/auth.php';
 
 // Redirect if already logged in
 if (isLoggedIn()) {
-    header("Location: index.php");
+    $user_type = $_SESSION['user_type'];
+    if ($user_type === 'student') {
+        header("Location: student_dashboard/student_dashboard.php");
+    } elseif ($user_type === 'teacher') {
+        header("Location: teacher_dashboard/teacher_dashboard.php");
+    } elseif ($user_type === 'admin') {
+        header("Location: IT_dashboard/admin_dashboard.php");
+    } else {
+        header("Location: index.php");
+    }
     exit();
 }
-///
+
 $error = '';
 $success = '';
 
@@ -21,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $user_type = trim($_POST['user_type']);
 
     // --- VALIDATIONS ---
-    if (empty($user_type) || !in_array($user_type, ['student','teacher'])) {
+    if (empty($user_type) || !in_array($user_type, ['student','teacher','admin'])) {
         $error = "Please select a valid user type.";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = "Please enter a valid email address.";
@@ -36,6 +45,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header("Location: student_dashboard/student_dashboard.php");
             } elseif ($user_type === 'teacher') {
                 header("Location: teacher_dashboard/teacher_dashboard.php");
+            } elseif ($user_type === 'admin') {
+                header("Location: IT_dashboard/admin_dashboard.php");
             } else {
                 header("Location: index.php");
             }
@@ -167,6 +178,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
           <option value="">Select role</option>
           <option value="student" <?php echo (isset($_POST['user_type']) && $_POST['user_type']=='student')?'selected':''; ?>>Student</option>
           <option value="teacher" <?php echo (isset($_POST['user_type']) && $_POST['user_type']=='teacher')?'selected':''; ?>>Teacher</option>
+          <option value="admin" <?php echo (isset($_POST['user_type']) && $_POST['user_type']=='admin')?'selected':''; ?>>IT Admin</option>
         </select>
       </div>
 
@@ -186,7 +198,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </form>
 
     <div class="login-link">
-      Don’t have an account? <a href="register.php">Register here</a>
+      Student registration? <a href="register.php">Register here</a>
     </div>
   </div>
 
