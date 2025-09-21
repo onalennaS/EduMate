@@ -114,12 +114,8 @@ include '../includes/admin_header.php';
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1200px;
             margin: 0 auto;
-        }
-
-        h1 {
-            color: #1e3a8a;
         }
 
         .card {
@@ -130,18 +126,23 @@ include '../includes/admin_header.php';
             box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
         }
 
+        h1, h2 {
+            color: #1e3a8a;
+        }
+
         label {
             display: block;
             margin-top: 0.5rem;
             font-weight: bold;
         }
 
-        input {
+        input, textarea, select {
             width: 100%;
             padding: 0.5rem;
             border: 1px solid #cbd5e1;
             border-radius: 6px;
             margin-top: 0.25rem;
+            box-sizing: border-box;
         }
 
         button {
@@ -173,8 +174,7 @@ include '../includes/admin_header.php';
             margin-top: 1rem;
         }
 
-        th,
-        td {
+        th, td {
             padding: 0.75rem;
             border-bottom: 1px solid #e2e8f0;
             text-align: left;
@@ -183,6 +183,14 @@ include '../includes/admin_header.php';
 
         th {
             background: #f1f5f9;
+            font-weight: bold;
+        }
+
+        img.thumb {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: cover;
         }
 
         .success {
@@ -200,12 +208,82 @@ include '../includes/admin_header.php';
             border-radius: 6px;
             margin-bottom: 1rem;
         }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .form-full {
+            grid-column: 1 / -1;
+        }
+
+        .teacher-details {
+            font-size: 0.9rem;
+        }
+
+        .teacher-name {
+            font-weight: bold;
+            color: #1f2937;
+            margin-bottom: 0.25rem;
+        }
+
+        .teacher-info {
+            color: #6b7280;
+            margin-bottom: 0.25rem;
+        }
+
+        .subject-badge {
+            display: inline-block;
+            background: #e0e7ff;
+            color: #3730a3;
+            padding: 0.25rem 0.5rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            margin-top: 0.25rem;
+        }
+
+        @media (max-width: 768px) {
+            .content {
+                margin-left: 0;
+                padding: 1rem;
+            }
+            
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            table {
+                font-size: 0.8rem;
+            }
+            
+            th, td {
+                padding: 0.5rem;
+            }
+        }
     </style>
     <script>
-        function confirmDelete(id) {
-            if (confirm("Are you sure you want to delete this teacher?")) {
+        function confirmDelete(id, name) {
+            if (confirm(`Are you sure you want to delete teacher "${name}"? This action cannot be undone.`)) {
                 document.getElementById('delete-id').value = id;
                 document.getElementById('delete-form').submit();
+            }
+        }
+
+        function toggleTeacherForm(id) {
+            const form = document.getElementById('teacher-form-' + id);
+            const btn = document.getElementById('toggle-btn-' + id);
+            if (form.style.display === 'none' || form.style.display === '') {
+                form.style.display = 'block';
+                btn.textContent = 'Cancel Edit';
+                btn.className = 'btn-red';
+            } else {
+                form.style.display = 'none';
+                btn.textContent = 'Edit';
+                btn.className = 'btn-blue';
             }
         }
     </script>
@@ -213,63 +291,110 @@ include '../includes/admin_header.php';
 
 <body>
     <div class="content">
-        <h1>Manage Teachers</h1>
+        <div class="container">
+            <h1>Manage Teachers</h1>
 
-        <?php if ($success): ?>
-            <div class="success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
-        <?php if ($errors): ?>
-            <div class="error"><?php foreach ($errors as $e)
-                echo htmlspecialchars($e) . "<br>"; ?></div><?php endif; ?>
-
-        <!-- Add Teacher -->
-        <div class="card">
-            <h2>Add New Teacher</h2>
-            <form method="POST">
-                <input type="hidden" name="action" value="add">
-                <label>Username <input type="text" name="username" required></label>
-                <label>Email <input type="email" name="email" required></label>
-                <label>Password <input type="password" name="password" required></label>
-                <button type="submit" class="btn-green">Create Teacher</button>
-            </form>
-        </div>
-
-        <!-- Teacher List -->
-        <div class="card">
-            <h2>All Teachers</h2>
-            <?php if (empty($teachers)): ?>
-                <p>No teachers found.</p>
-            <?php else: ?>
-                <table>
-                    <tr>
-                        <th>ID</th>
-                        <th>Details (Edit)</th>
-                        <th>Actions</th>
-                    </tr>
-                    <?php foreach ($teachers as $t): ?>
-                        <tr>
-                            <td><?= $t['id'] ?></td>
-                            <td>
-                                <form method="POST">
-                                    <input type="hidden" name="action" value="edit">
-                                    <input type="hidden" name="teacher_id" value="<?= $t['id'] ?>">
-                                    <label>Username <input type="text" name="username"
-                                            value="<?= htmlspecialchars($t['username']) ?>"></label>
-                                    <label>Email <input type="email" name="email"
-                                            value="<?= htmlspecialchars($t['email']) ?>"></label>
-                                    <label>New Password (leave blank to keep unchanged)
-                                        <input type="password" name="new_password" placeholder="Enter new password">
-                                    </label>
-                                    <small>Created: <?= date("M d, Y", strtotime($t['created_at'])) ?></small><br>
-                                    <button type="submit" class="btn-blue">Update</button>
-                                </form>
-                            </td>
-                            <td>
-                                <button type="button" class="btn-red" onclick="confirmDelete(<?= $t['id'] ?>)">Delete</button>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                </table>
+            <?php if ($success): ?>
+                <div class="success"><?= htmlspecialchars($success) ?></div>
             <?php endif; ?>
+            
+            <?php if ($errors): ?>
+                <div class="error">
+                    <?php foreach ($errors as $e): ?>
+                        <?= htmlspecialchars($e) ?><br>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Add Teacher -->
+            <div class="card">
+                <h2>Add New Teacher</h2>
+                <form method="POST">
+                    <input type="hidden" name="action" value="add">
+                    
+                    <div class="form-row">
+                        <div>
+                            <label>Username <input type="text" name="username" required></label>
+                        </div>
+                        <div>
+                            <label>Email <input type="email" name="email" required></label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-full">
+                        <label>Password <input type="password" name="password" required></label>
+                    </div>
+                    
+                    <button type="submit" class="btn-green">Create Teacher</button>
+                </form>
+            </div>
+
+            <!-- Teacher List -->
+            <div class="card">
+                <h2>All Teachers (<?= count($teachers) ?>)</h2>
+                <?php if (empty($teachers)): ?>
+                    <p>No teachers found.</p>
+                <?php else: ?>
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Teacher Details</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($teachers as $t): ?>
+                                <tr>
+                                    <td><?= $t['id'] ?></td>
+                                    <td>
+                                        <div class="teacher-details">
+                                            <div class="teacher-name">
+                                                <?= htmlspecialchars($t['username']) ?>
+                                            </div>
+                                            <div class="teacher-info">
+                                                <strong>Email:</strong> <?= htmlspecialchars($t['email']) ?><br>
+                                                <strong>Created:</strong> <?= date("M d, Y", strtotime($t['created_at'])) ?>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <button type="button" id="toggle-btn-<?= $t['id'] ?>" class="btn-blue" onclick="toggleTeacherForm(<?= $t['id'] ?>)">Edit</button>
+                                        <button type="button" class="btn-red" onclick="confirmDelete(<?= $t['id'] ?>, '<?= htmlspecialchars($t['username']) ?>')">Delete</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3">
+                                        <div id="teacher-form-<?= $t['id'] ?>" style="display: none; padding: 1rem; background: #f9fafb; border-radius: 6px; margin: 0.5rem 0;">
+                                            <form method="POST">
+                                                <input type="hidden" name="action" value="edit">
+                                                <input type="hidden" name="teacher_id" value="<?= $t['id'] ?>">
+                                                
+                                                <h4>Edit Teacher: <?= htmlspecialchars($t['username']) ?></h4>
+                                                
+                                                <div class="form-row">
+                                                    <div>
+                                                        <label>Username <input type="text" name="username" value="<?= htmlspecialchars($t['username']) ?>"></label>
+                                                    </div>
+                                                    <div>
+                                                        <label>Email <input type="email" name="email" value="<?= htmlspecialchars($t['email']) ?>"></label>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="form-full">
+                                                    <label>New Password (leave blank to keep) <input type="password" name="new_password" placeholder="Enter new password"></label>
+                                                </div>
+                                                
+                                                <button type="submit" class="btn-green">Update Teacher</button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php endif; ?>
+            </div>
         </div>
     </div>
 
