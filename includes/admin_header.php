@@ -1,6 +1,6 @@
 <?php
 // Start session and check authentication if needed
-session_start();
+
 // Add authentication check here if required
 ?>
 
@@ -466,7 +466,7 @@ session_start();
         <div class="sidebar-nav">
             <ul class="nav flex-column">
                 <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'it_admin_dashboard.php' ? 'active' : ''; ?>" href="it_admin_dashboard.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'it_admin_dashboard.php' ? 'active' : ''; ?>" href="admin_dashboard.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Dashboard">
                         <i class="fas fa-tachometer-alt"></i>
                         <span>Dashboard</span>
                     </a>
@@ -484,7 +484,7 @@ session_start();
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'subject_enrollment.php' ? 'active' : ''; ?>" href="subject_enrollment.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Subject Enrollment">
+                    <a class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'subject_enrollment.php' ? 'active' : ''; ?>" href="admin_enroll_students.php" data-bs-toggle="tooltip" data-bs-placement="right" title="Subject Enrollment">
                         <i class="fas fa-book"></i>
                         <span>Subject Enrollment</span>
                     </a>
