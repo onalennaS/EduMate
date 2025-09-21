@@ -107,6 +107,105 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error_message = "Please select a valid image file.";
                 }
                 break;
+
+            case 'upload_academic_report':
+                // Handle academic report upload
+                if (isset($_FILES['academic_report']) && $_FILES['academic_report']['error'] === UPLOAD_ERR_OK) {
+                    $file = $_FILES['academic_report'];
+                    $allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif'];
+                    $max_size = 10 * 1024 * 1024; // 10MB
+                    
+                    if (in_array($file['type'], $allowed_types) && $file['size'] <= $max_size) {
+                        $upload_dir = '../uploads/academic_reports/';
+                        if (!is_dir($upload_dir)) {
+                            mkdir($upload_dir, 0777, true);
+                        }
+                        
+                        // Generate unique filename
+                        $file_extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+                        $filename = 'report_' . $student_id . '_' . time() . '.' . $file_extension;
+                        $destination = $upload_dir . $filename;
+                        
+                        if (move_uploaded_file($file['tmp_name'], $destination)) {
+                            // Update database with new academic report path
+                            $academic_report_path = 'uploads/academic_reports/' . $filename;
+                            
+                            $stmt = $pdo->prepare("UPDATE users SET academic_report = ? WHERE id = ?");
+                            $stmt->execute([$academic_report_path, $student_id]);
+                            
+                            $success_message = "Academic report uploaded successfully!";
+                        } else {
+                            $error_message = "Error uploading academic report.";
+                        }
+                    } else {
+                        $error_message = "Invalid file type or size. Please upload PDF or image files under 10MB.";
+                    }
+                } else {
+                    $error_message = "Please select a valid academic report file.";
+                }
+                break;
+
+            case 'upload_id_copy':
+                // Handle ID copy upload
+                if (isset($_FILES['id_copy']) && $_FILES['id_copy']['error'] === UPLOAD_ERR_OK) {
+                    $file = $_FILES['id_copy'];
+                    $allowed_types = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif'];
+                    $max_size = 5 * 1024 * 1024; // 5MB
+                    
+                    if (in_array($file['type'], $allowed_types) && $file['size'] <= $max_size) {
+                        $upload_dir = '../uploads/id_copies/';
+                        if (!is_dir($upload_dir)) {
+                            mkdir($upload_dir, 0777, true);
+                        }
+                        
+                        // Generate unique filename
+                        $file_extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+                        $filename = 'id_' . $student_id . '_' . time() . '.' . $file_extension;
+                        $destination = $upload_dir . $filename;
+                        
+                        if (move_uploaded_file($file['tmp_name'], $destination)) {
+                            // Update database with new ID copy path
+                            $id_copy_path = 'uploads/id_copies/' . $filename;
+                            
+                            $stmt = $pdo->prepare("UPDATE users SET id_copy = ? WHERE id = ?");
+                            $stmt->execute([$id_copy_path, $student_id]);
+                            
+                            $success_message = "ID copy uploaded successfully!";
+                        } else {
+                            $error_message = "Error uploading ID copy.";
+                        }
+                    } else {
+                        $error_message = "Invalid file type or size. Please upload PDF or image files under 5MB.";
+                    }
+                } else {
+                    $error_message = "Please select a valid ID copy file.";
+                }
+                break;
+
+            case 'delete_document':
+                $document_type = $_POST['document_type'];
+                $allowed_types = ['academic_report', 'id_copy'];
+                
+                if (in_array($document_type, $allowed_types)) {
+                    // Get current file path
+                    $stmt = $pdo->prepare("SELECT $document_type FROM users WHERE id = ?");
+                    $stmt->execute([$student_id]);
+                    $current_file = $stmt->fetch(PDO::FETCH_ASSOC)[$document_type];
+                    
+                    // Delete file from server
+                    if (!empty($current_file) && file_exists('../' . $current_file)) {
+                        unlink('../' . $current_file);
+                    }
+                    
+                    // Update database
+                    $stmt = $pdo->prepare("UPDATE users SET $document_type = NULL WHERE id = ?");
+                    $stmt->execute([$student_id]);
+                    
+                    $success_message = ucfirst(str_replace('_', ' ', $document_type)) . " deleted successfully!";
+                } else {
+                    $error_message = "Invalid document type.";
+                }
+                break;
         }
     }
 }
@@ -122,6 +221,8 @@ $last_name = $user['last_name'] ?? '';
 $email = $user['email'] ?? '';
 $grade = $user['grade'] ?? '';
 $profile_picture = $user['profile_picture'] ?? '';
+$academic_report = $user['academic_report'] ?? '';
+$id_copy = $user['id_copy'] ?? '';
 
 // Get student name for display
 $student_name = '';
@@ -203,8 +304,8 @@ $additional_css = '
     }
     .profile-image-container {
         position: relative;
-        width: 90px; /* Further reduced from 120px */
-        height: 90px; /* Further reduced from 120px */
+        width: 90px;
+        height: 90px;
         margin: 0 auto;
     }
     .profile-image {
@@ -289,6 +390,58 @@ $additional_css = '
         border-color: var(--primary-color);
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
     }
+    .document-item {
+        background: #f8f9fa;
+        border: 2px dashed #dee2e6;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+        transition: all 0.3s ease;
+    }
+    .document-item.has-file {
+        background: #e8f5e8;
+        border-color: #28a745;
+        border-style: solid;
+    }
+    .document-item:hover {
+        border-color: var(--primary-color);
+        background: #f0f7ff;
+    }
+    .document-preview {
+        max-width: 100%;
+        max-height: 200px;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+    }
+    .file-info {
+        background: #fff;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        padding: 0.75rem;
+        margin-top: 1rem;
+        text-align: left;
+    }
+    .delete-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        cursor: pointer;
+        opacity: 0.8;
+        transition: opacity 0.2s ease;
+    }
+    .delete-btn:hover {
+        opacity: 1;
+    }
     @media (max-width: 768px) {
         .profile-image-container {
             width: 80px;
@@ -313,6 +466,7 @@ $additional_css = '
         <p class="text-muted mb-0">Manage your account information and settings</p>
     </div>
 </div>
+
 <!-- SweetAlert2 CSS & JS -->
 <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
@@ -341,9 +495,7 @@ $additional_css = '
 </script>
 <?php endif; ?>
 
-
-
-<!-- Profile Header - Fixed Layout with Smaller Image -->
+<!-- Profile Header -->
 <div class="profile-header mb-4">
     <div class="profile-header-content">
         <div class="row align-items-center">
@@ -372,7 +524,6 @@ $additional_css = '
         </div>
     </div>
 </div>
-
 
 <!-- Quick Stats -->
 <div class="row mb-4">
@@ -418,6 +569,11 @@ $additional_css = '
             <li class="nav-item" role="presentation">
                 <button class="nav-link active" id="personal-tab" data-bs-toggle="pill" data-bs-target="#personal" type="button" role="tab" aria-controls="personal" aria-selected="true">
                     <i class="fas fa-user me-2"></i>Personal Information
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="documents-tab" data-bs-toggle="pill" data-bs-target="#documents" type="button" role="tab" aria-controls="documents" aria-selected="false">
+                    <i class="fas fa-file-upload me-2"></i>Documents
                 </button>
             </li>
             <li class="nav-item" role="presentation">
@@ -485,6 +641,168 @@ $additional_css = '
                     </div>
                 </form>
             </div>
+
+            <!-- Documents Tab -->
+            <div class="tab-pane fade" id="documents" role="tabpanel" aria-labelledby="documents-tab">
+                <div class="row mb-4">
+                    <div class="col-md-8">
+                        <h6 class="text-primary mb-3">Academic Documents</h6>
+                        <p class="text-muted mb-4">
+                            Upload your academic reports and identification documents for verification purposes.
+                        </p>
+                    </div>
+                    <div class="col-md-4 text-center">
+                        <i class="fas fa-file-upload text-primary mb-2" style="font-size: 3rem; opacity: 0.3;"></i>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Academic Report Upload -->
+                    <div class="col-md-6 mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-graduation-cap me-2 text-info"></i>Academic Report
+                        </h6>
+                        
+                        <div class="document-item <?php echo !empty($academic_report) ? 'has-file' : ''; ?>" style="position: relative;">
+                            <?php if (!empty($academic_report)): ?>
+                                <form method="POST" style="display: inline;">
+                                    <input type="hidden" name="action" value="delete_document">
+                                    <input type="hidden" name="document_type" value="academic_report">
+                                    <button type="submit" class="delete-btn" onclick="return confirm('Are you sure you want to delete this document?')">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
+                                
+                                <?php 
+                                $file_extension = strtolower(pathinfo($academic_report, PATHINFO_EXTENSION));
+                                if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
+                                    <img src="../<?php echo $academic_report; ?>" class="document-preview" alt="Academic Report">
+                                <?php else: ?>
+                                    <i class="fas fa-file-pdf text-danger" style="font-size: 4rem; margin-bottom: 1rem;"></i>
+                                <?php endif; ?>
+                                
+                                <div class="file-info">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>Academic Report</strong><br>
+                                            <small class="text-muted">
+                                                <?php echo strtoupper($file_extension); ?> • 
+                                                <?php echo date('M d, Y', filemtime('../' . $academic_report)); ?>
+                                            </small>
+                                        </div>
+                                        <a href="../<?php echo $academic_report; ?>" target="_blank" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye me-1"></i>View
+                                        </a>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <i class="fas fa-cloud-upload-alt text-muted" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                                <p class="text-muted mb-2">No academic report uploaded</p>
+                                <small class="text-muted">Click below to upload your latest academic report</small>
+                            <?php endif; ?>
+                            
+                            <form method="POST" enctype="multipart/form-data" class="mt-3">
+                                <input type="hidden" name="action" value="upload_academic_report">
+                                <div class="input-group">
+                                    <input type="file" class="form-control" name="academic_report" accept=".pdf,.jpg,.jpeg,.png,.gif" required>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-upload me-1"></i>Upload
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mt-1">PDF or Image files, max 10MB</small>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- ID Copy Upload -->
+                    <div class="col-md-6 mb-4">
+                        <h6 class="mb-3">
+                            <i class="fas fa-id-card me-2 text-warning"></i>ID Copy
+                        </h6>
+                        
+                        <div class="document-item <?php echo !empty($id_copy) ? 'has-file' : ''; ?>" style="position: relative;">
+                            <?php if (!empty($id_copy)): ?>
+                                <form method="POST" style="display: inline;">
+                                    <input type="hidden" name="action" value="delete_document">
+                                    <input type="hidden" name="document_type" value="id_copy">
+                                    <button type="submit" class="delete-btn" onclick="return confirm('Are you sure you want to delete this document?')">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </form>
+                                
+                                <?php 
+                                $file_extension = strtolower(pathinfo($id_copy, PATHINFO_EXTENSION));
+                                if (in_array($file_extension, ['jpg', 'jpeg', 'png', 'gif'])): ?>
+                                    <img src="../<?php echo $id_copy; ?>" class="document-preview" alt="ID Copy">
+                                <?php else: ?>
+                                    <i class="fas fa-file-pdf text-danger" style="font-size: 4rem; margin-bottom: 1rem;"></i>
+                                <?php endif; ?>
+                                
+                                <div class="file-info">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong>ID Copy</strong><br>
+                                            <small class="text-muted">
+                                                <?php echo strtoupper($file_extension); ?> • 
+                                                <?php echo date('M d, Y', filemtime('../' . $id_copy)); ?>
+                                            </small>
+                                        </div>
+                                        <a href="../<?php echo $id_copy; ?>" target="_blank" class="btn btn-sm btn-outline-primary">
+                                            <i class="fas fa-eye me-1"></i>View
+                                        </a>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                <i class="fas fa-cloud-upload-alt text-muted" style="font-size: 3rem; margin-bottom: 1rem;"></i>
+                                <p class="text-muted mb-2">No ID copy uploaded</p>
+                                <small class="text-muted">Click below to upload a copy of your identification</small>
+                            <?php endif; ?>
+                            
+                            <form method="POST" enctype="multipart/form-data" class="mt-3">
+                                <input type="hidden" name="action" value="upload_id_copy">
+                                <div class="input-group">
+                                    <input type="file" class="form-control" name="id_copy" accept=".pdf,.jpg,.jpeg,.png,.gif" required>
+                                    <button type="submit" class="btn btn-primary">
+                                        <i class="fas fa-upload me-1"></i>Upload
+                                    </button>
+                                </div>
+                                <small class="text-muted d-block mt-1">PDF or Image files, max 5MB</small>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Document Guidelines -->
+                <div class="alert alert-info">
+                    <h6 class="alert-heading">
+                        <i class="fas fa-info-circle me-2"></i>Document Upload Guidelines
+                    </h6>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <strong>Academic Report:</strong>
+                            <ul class="mb-0 mt-1">
+                                <li>Latest term/semester report card</li>
+                              
+                                <li>Maximum file size: 10MB</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <strong>ID Copy:</strong>
+                            <ul class="mb-0 mt-1">
+                                <li>Student ID card</li>
+                                <li>Birth certificate</li>
+                                <li>Passport or national ID</li>
+                                <li>Maximum file size: 5MB</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <hr>
+                    <small class="mb-0">
+                        <strong>Note:</strong> All documents are securely stored and used only for verification purposes. 
+                        Accepted formats: PDF, JPG, PNG, GIF.
+                    </small>
+                </div>
+            </div>
             
             <!-- Change Password Tab -->
             <div class="tab-pane fade" id="password" role="tabpanel" aria-labelledby="password-tab">
@@ -539,7 +857,6 @@ $additional_css = '
 </div>
 
 <!-- Profile Picture Modal -->
-
 <div class="modal fade" id="profilePictureModal" tabindex="-1" aria-labelledby="profilePictureModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-sm">
         <div class="modal-content">
@@ -590,6 +907,7 @@ document.getElementById('profile_picture').addEventListener('change', function(e
         reader.readAsDataURL(file);
     }
 });
+
 // Initialize tab functionality
 document.addEventListener('DOMContentLoaded', function() {
     const profileTabs = document.getElementById('profileTabs');
@@ -605,14 +923,38 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
     
+    // File upload progress indication
+    const fileInputs = document.querySelectorAll('input[type="file"]');
+    fileInputs.forEach(function(input) {
+        input.addEventListener('change', function() {
+            const submitBtn = this.parentNode.querySelector('button[type="submit"]');
+            if (this.files.length > 0 && submitBtn) {
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Ready to Upload';
+            }
+        });
+    });
+    
+    // Form submission handling
+    const uploadForms = document.querySelectorAll('form[enctype="multipart/form-data"]');
+    uploadForms.forEach(function(form) {
+        form.addEventListener('submit', function() {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i>Uploading...';
+            }
+        });
+    });
+    
     // Announce page load for screen readers
     if (document.body.getAttribute('data-screen-reader') === 'true') {
         setTimeout(() => {
-            announceToScreenReader('Student profile page loaded. You can update your personal information and change your password.');
+            announceToScreenReader('Student profile page loaded. You can update your personal information, upload documents, and change your password.');
         }, 1000);
     }
 });
 </script>
+
 <style>
     /* Make all nav links in the profile tabs black */
 .content-card .nav-pills .nav-link {
@@ -690,7 +1032,37 @@ document.addEventListener('DOMContentLoaded', function() {
     padding: 6px 14px;
 }
 
-    </style>
+/* Document Upload Styling */
+.document-item {
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.document-item.has-file {
+    justify-content: flex-start;
+    align-items: stretch;
+}
+
+.file-info {
+    margin-top: auto;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .document-item {
+        min-height: 250px;
+        margin-bottom: 1rem;
+    }
+    
+    .document-preview {
+        max-height: 150px;
+    }
+}
+</style>
+
 <?php
 // Include the footer
 include '../includes/student_footer.php';

@@ -46,15 +46,6 @@ CREATE TABLE `users` (
   `last_login` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
---
--- Dumping data for table `users`
---
-
-INSERT INTO `users` (`id`, `username`, `first_name`, `last_name`, `email`, `phone`, `password`, `user_type`, `grade`, `accessibility_needs`, `bio`, `department`, `profile_picture`, `full_name`, `created_at`, `last_login`) VALUES
-(2, 'ona', 'onalenna student', 'Hamese', 'onalennahamese07@gmail.com', NULL, '$2y$10$W6cu3XqNbxhdI7Pd5DRuLe1hCO2um1Myz9xVq83E3Uh8NtU1St6Nm', 'student', 12, NULL, NULL, NULL, 'uploads/profile_pictures/student_2_1758292138.png', NULL, '2025-09-06 10:49:30', '2025-09-19 15:03:50'),
-(4, 'Teacher', 'Teacher Onalenna', 'Hamese', 'onalennahamese@gmail.com', NULL, '$2y$10$6gNHEqw.kbsq22UC7LlXeuDcaA3SuykOLGSYzbAFARYeE.V48ZnSy', 'teacher', NULL, NULL, 'i am me dah', 'Teacher', 'uploads/profile_pictures/teacher_4_1758292227.png', NULL, '2025-09-09 23:09:43', '2025-09-19 15:09:37'),
-(6, 'onalenna', NULL, NULL, 'onalennahames@gmail.com', NULL, '$2y$10$iJNUbBJ0qRg6gwGJoOq.he0z5JqOobH/fXJ/zJEhnAzYCaDAyR/aa', 'student', 8, NULL, NULL, NULL, NULL, NULL, '2025-09-20 13:36:22', '2025-09-20 13:36:39'),
-(10, 'admin', NULL, NULL, 'admin@edumate.com', NULL, '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'admin', NULL, NULL, NULL, NULL, NULL, NULL, '2025-09-20 14:00:54', '2025-09-20 14:08:59');
 
 --
 -- Indexes for dumped tables
